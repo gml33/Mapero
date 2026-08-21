@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper;
+package app.mapero.wifi;
 
 import android.Manifest;
 import android.content.Context;
@@ -24,16 +24,16 @@ import androidx.core.content.FileProvider;
 import androidx.lifecycle.Observer;
 
 import com.google.android.material.button.MaterialButton;
-import com.marcelo.wifimapper.data.AppDatabase;
-import com.marcelo.wifimapper.data.WifiApSummary;
-import com.marcelo.wifimapper.data.WifiMeasurement;
-import com.marcelo.wifimapper.data.SignalAggregator;
-import com.marcelo.wifimapper.export.Exporter;
-import com.marcelo.wifimapper.overlays.PulseOverlay;
-import com.marcelo.wifimapper.overlays.WifiInfoWindow;
-import com.marcelo.wifimapper.scan.LocationHelper;
-import com.marcelo.wifimapper.scan.WifiScanner;
-import com.marcelo.wifimapper.scan.WifiScannerHolder;
+import app.mapero.wifi.data.AppDatabase;
+import app.mapero.wifi.data.WifiApSummary;
+import app.mapero.wifi.data.WifiMeasurement;
+import app.mapero.wifi.data.SignalAggregator;
+import app.mapero.wifi.export.Exporter;
+import app.mapero.wifi.overlays.PulseOverlay;
+import app.mapero.wifi.overlays.WifiInfoWindow;
+import app.mapero.wifi.scan.LocationHelper;
+import app.mapero.wifi.scan.WifiScanner;
+import app.mapero.wifi.scan.WifiScannerHolder;
 
 import java.io.File;
 import java.util.concurrent.ExecutorService;

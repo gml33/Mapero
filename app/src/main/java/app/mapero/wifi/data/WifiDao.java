@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper.data;
+package app.mapero.wifi.data;
 
 import androidx.room.Dao;
 import androidx.room.Insert;

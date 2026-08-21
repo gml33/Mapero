@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper.data;
+package app.mapero.wifi.data;
 
 /**
  * Resultado agregado de un punto de acceso: promedia la señal y las coordenadas,

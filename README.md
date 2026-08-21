@@ -92,7 +92,7 @@ La documentación detallada está en [`docs/`](docs/):
 - [`docs/arquitectura.md`](docs/arquitectura.md): componentes, flujo de datos y decisiones.
 - [`docs/agregacion.md`](docs/agregacion.md): lógica de agrupación y trilateración.
 
-### Módulos (paquete `com.marcelo.wifimapper`)
+### Módulos
 
 | Paquete | Responsabilidad |
 |---|---|

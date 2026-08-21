@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper;
+package app.mapero.wifi;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -12,8 +12,8 @@ import android.os.IBinder;
 
 import androidx.core.app.NotificationCompat;
 
-import com.marcelo.wifimapper.scan.WifiScanner;
-import com.marcelo.wifimapper.scan.WifiScannerHolder;
+import app.mapero.wifi.scan.WifiScanner;
+import app.mapero.wifi.scan.WifiScannerHolder;
 
 /**
  * Servicio en primer plano que mantiene el escaneo WiFi activo con la pantalla
@@ -23,8 +23,8 @@ public class ScanService extends Service implements WifiScanner.Listener {
 
     private static final String CHANNEL_ID = "scan";
     private static final int NOTIF_ID = 1;
-    public static final String ACTION_START = "com.marcelo.wifimapper.action.START";
-    public static final String ACTION_STOP = "com.marcelo.wifimapper.action.STOP";
+    public static final String ACTION_START = "app.mapero.wifi.action.START";
+    public static final String ACTION_STOP = "app.mapero.wifi.action.STOP";
 
     private WifiScanner scanner;
 

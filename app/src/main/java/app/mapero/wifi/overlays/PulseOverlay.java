@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper.overlays;
+package app.mapero.wifi.overlays;
 
 import android.animation.Animator;
 import android.animation.ValueAnimator;

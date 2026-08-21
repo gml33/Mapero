@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.marcelo.wifimapper'
+    namespace 'app.mapero.wifi'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.marcelo.wifimapper"
+        applicationId "app.mapero.wifi"
         minSdk 26
         targetSdk 34
         versionCode 1

@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper.scan;
+package app.mapero.wifi.scan;
 
 import android.content.Context;
 

@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper.scan;
+package app.mapero.wifi.scan;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -17,8 +17,8 @@ import android.util.Log;
 
 import androidx.core.content.ContextCompat;
 
-import com.marcelo.wifimapper.data.AppDatabase;
-import com.marcelo.wifimapper.data.WifiMeasurement;
+import app.mapero.wifi.data.AppDatabase;
+import app.mapero.wifi.data.WifiMeasurement;
 
 import java.util.ArrayList;
 import java.util.HashMap;

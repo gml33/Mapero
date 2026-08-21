@@ -1,6 +1,6 @@
-package com.marcelo.wifimapper.export;
+package app.mapero.wifi.export;
 
-import com.marcelo.wifimapper.data.WifiApSummary;
+import app.mapero.wifi.data.WifiApSummary;
 
 import java.io.File;
 import java.io.FileOutputStream;

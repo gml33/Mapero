@@ -1,4 +1,4 @@
-package com.marcelo.wifimapper;
+package app.mapero.wifi;
 
 import android.content.Context;
 import android.content.SharedPreferences;

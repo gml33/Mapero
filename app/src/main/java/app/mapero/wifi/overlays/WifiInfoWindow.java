@@ -1,10 +1,10 @@
-package com.marcelo.wifimapper.overlays;
+package app.mapero.wifi.overlays;
 
 import android.content.Context;
 import android.view.View;
 import android.widget.TextView;
 
-import com.marcelo.wifimapper.R;
+import app.mapero.wifi.R;
 
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;

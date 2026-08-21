@@ -79,26 +79,63 @@ async function renderStats() {
 
 async function renderUsers() {
   const users = await api('/api/admin/users');
-  $('view-users').innerHTML = `<div class="card"><h2>Usuarios</h2>
-    <table>
-      <tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Registrado</th><th></th></tr>
-      ${users.map((u) => `<tr>
-        <td>${u.id}</td><td>${esc(u.username)}</td>
-        <td>
-          <select onchange="setRole(${u.id}, this.value)">
-            <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
-            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+  $('view-users').innerHTML = `
+    <div class="card"><h2>Crear usuario</h2>
+      <form id="newUserForm">
+        <field><label>Usuario</label><input id="nu_user" required></field>
+        <field><label>Contraseña</label><input id="nu_pass" type="password" required></field>
+        <field><label>Rol</label>
+          <select id="nu_role">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
           </select>
-        </td>
-        <td>${new Date(u.created_at).toLocaleDateString()}</td>
-        <td><button class="small danger" onclick="delUser(${u.id})">Borrar</button></td>
-      </tr>`).join('')}
-    </table></div>`;
+        </field>
+        <field class="full"><button type="submit">Crear</button></field>
+      </form>
+    </div>
+    <div class="card"><h2>Usuarios (${users.length})</h2>
+      <table>
+        <tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Nueva contraseña</th><th>Registrado</th><th></th></tr>
+        ${users.map((u) => `<tr>
+          <td>${u.id}</td><td>${esc(u.username)}</td>
+          <td>
+            <select onchange="setRole(${u.id}, this.value)">
+              <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+              <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+            </select>
+          </td>
+          <td><input id="pass_${u.id}" type="password" placeholder="nueva pass" style="padding:5px;border:1px solid #ccc;border-radius:6px">
+            <button class="small" onclick="changePass(${u.id})">Cambiar</button></td>
+          <td>${new Date(u.created_at).toLocaleDateString()}</td>
+          <td><button class="small danger" onclick="delUser(${u.id})">Borrar</button></td>
+        </tr>`).join('')}
+      </table>
+    </div>`;
+
+  $('newUserForm').onsubmit = async (e) => {
+    e.preventDefault();
+    await api('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: $('nu_user').value.trim(),
+        password: $('nu_pass').value,
+        role: $('nu_role').value,
+      }),
+    });
+    renderUsers();
+  };
 }
 
 async function setRole(id, role) {
   await api('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ role }) });
   renderUsers();
+}
+async function changePass(id) {
+  const pass = $('pass_' + id).value;
+  if (!pass) return alert('Escribí una contraseña');
+  await api('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ password: pass }) });
+  alert('Contraseña actualizada');
+  $('pass_' + id).value = '';
 }
 async function delUser(id) {
   if (!confirm('¿Borrar este usuario y sus datos?')) return;
@@ -106,25 +143,75 @@ async function delUser(id) {
   renderUsers();
 }
 
-async function renderMeasurements() {
-  const d = await api('/api/admin/measurements?limit=200');
-  $('view-measurements').innerHTML = `<div class="card">
-    <h2>Mediciones (${d.total})</h2>
-    <button class="danger" onclick="clearMeasurements()">Borrar todas</button>
-    <table>
-      <tr><th>Usuario</th><th>SSID</th><th>BSSID</th><th>RSSI</th><th>Pos</th><th>Fecha</th></tr>
-      ${d.rows.map((m) => `<tr>
-        <td>${esc(m.username)}</td><td>${esc(m.ssid)}</td><td>${esc(m.bssid)}</td>
-        <td>${m.rssi}</td>
-        <td>${m.latitude.toFixed(4)}, ${m.longitude.toFixed(4)}</td>
-        <td>${new Date(m.ts).toLocaleString()}</td>
-      </tr>`).join('')}
-    </table></div>`;
+let meas = { offset: 0, limit: 50, filters: {} };
+
+async function loadMeasurements() {
+  const p = new URLSearchParams({ limit: meas.limit, offset: meas.offset });
+  for (const k of ['user', 'from', 'to', 'q']) {
+    if (meas.filters[k]) p.set(k, meas.filters[k]);
+  }
+  const d = await api('/api/admin/measurements?' + p.toString());
+  renderMeasurements(d);
 }
+
+async function renderMeasurements(d) {
+  const pages = Math.ceil(d.total / d.limit) || 1;
+  const page = Math.floor(d.offset / d.limit) + 1;
+  $('view-measurements').innerHTML = `
+    <div class="card"><h2>Filtros</h2>
+      <form id="filtersForm">
+        <field><label>Usuario</label><input id="f_user" value="${esc(meas.filters.user || '')}"></field>
+        <field><label>Desde</label><input id="f_from" type="date" value="${esc(meas.filters.from || '')}"></field>
+        <field><label>Hasta</label><input id="f_to" type="date" value="${esc(meas.filters.to || '')}"></field>
+        <field><label>Nombre de red</label><input id="f_q" value="${esc(meas.filters.q || '')}"></field>
+        <field><button type="submit">Aplicar</button>
+          <button type="button" class="ghost" style="color:#00695c;border:1px solid #00695c" onclick="resetFilters()">Limpiar</button></field>
+      </form>
+    </div>
+    <div class="card"><h2>Mediciones (${d.total})</h2>
+      <button class="danger" onclick="clearMeasurements()">Borrar todas</button>
+      <div style="margin:8px 0">
+        <button ${d.offset === 0 ? 'disabled' : ''} onclick="pageMeas(-1)">← Prev</button>
+        <span style="margin:0 10px;font-size:13px">Página ${page} de ${pages}</span>
+        <button ${d.offset + d.limit >= d.total ? 'disabled' : ''} onclick="pageMeas(1)">Next →</button>
+      </div>
+      <table>
+        <tr><th>Usuario</th><th>SSID</th><th>BSSID</th><th>RSSI</th><th>Pos</th><th>Fecha</th></tr>
+        ${d.rows.map((m) => `<tr>
+          <td>${esc(m.username)}</td><td>${esc(m.ssid)}</td><td>${esc(m.bssid)}</td>
+          <td>${m.rssi}</td>
+          <td>${m.latitude.toFixed(4)}, ${m.longitude.toFixed(4)}</td>
+          <td>${new Date(m.ts).toLocaleString()}</td>
+        </tr>`).join('')}
+      </table>
+    </div>`;
+
+  $('filtersForm').onsubmit = (e) => {
+    e.preventDefault();
+    meas.filters = {
+      user: $('f_user').value.trim(),
+      from: $('f_from').value || '',
+      to: $('f_to').value || '',
+      q: $('f_q').value.trim(),
+    };
+    meas.offset = 0;
+    loadMeasurements();
+  };
+}
+
+function pageMeas(delta) {
+  meas.offset = Math.max(0, meas.offset + delta * meas.limit);
+  loadMeasurements();
+}
+function resetFilters() {
+  meas = { offset: 0, limit: 50, filters: {} };
+  loadMeasurements();
+}
+
 async function clearMeasurements() {
   if (!confirm('¿Borrar TODAS las mediciones?')) return;
   await api('/api/admin/measurements', { method: 'DELETE' });
-  renderMeasurements();
+  loadMeasurements();
 }
 
 async function renderConfig() {

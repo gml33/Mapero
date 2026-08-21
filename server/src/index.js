@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool, initDb } from './db.js';
 import { buildTerritories } from './territories.js';
-import { register, login, requireAuth, requireAdmin } from './auth.js';
+import { register, login, requireAuth, requireAdmin, createUser, setUserRole, setUserPassword } from './auth.js';
 import { getSettings, updateSettings, appConfig } from './config.js';
 
 dotenv.config();
@@ -260,18 +260,32 @@ app.get('/api/admin/users', requireAdmin, async (_req, res) => {
   }
 });
 
-// Editar rol de un usuario
+// Crear usuario (admin)
+app.post('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const role = ['admin', 'user'].includes(req.body?.role) ? req.body.role : 'user';
+    const user = await createUser(req.body?.username, req.body?.password, role);
+    res.status(201).json(user);
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Editar rol y/o contraseña de un usuario
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
   try {
-    const role = req.body?.role;
-    if (!['admin', 'user'].includes(role)) {
-      return res.status(400).json({ error: 'Rol inválido' });
+    if (req.body?.role !== undefined) {
+      if (!['admin', 'user'].includes(req.body.role)) {
+        return res.status(400).json({ error: 'Rol inválido' });
+      }
+      await setUserRole(req.params.id, req.body.role);
     }
-    await pool.query('UPDATE users SET role = $1 WHERE id = $2',
-      [role, req.params.id]);
+    if (req.body?.password !== undefined) {
+      await setUserPassword(req.params.id, req.body.password);
+    }
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: 'Error interno' });
+    res.status(e.status || 500).json({ error: e.message });
   }
 });
 
@@ -285,19 +299,35 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Mediciones: listar (paginado) y borrar
+// Mediciones: listar (paginado + filtros) y borrar
 app.get('/api/admin/measurements', requireAdmin, async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 100, 500);
-    const offset = Number(req.query.offset) || 0;
-    const { rows } = await pool.query(
-      `SELECT m.id, u.username, m.bssid, m.ssid, m.latitude, m.longitude,
-              m.rssi, m.ts
-       FROM measurements m JOIN users u ON u.id = m.user_id
-       ORDER BY m.ts DESC LIMIT $1 OFFSET $2`, [limit, offset]);
-    const cnt = await pool.query('SELECT COUNT(*)::int n FROM measurements');
-    res.json({ total: cnt.rows[0].n, rows });
+    const limit = Math.min(Number(req.query.limit) || 50, 500);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+    const cond = [];
+    const params = [];
+    const push = (sql, v) => { params.push(v); cond.push(sql); };
+
+    if (req.query.user) { params.push(req.query.user); cond.push('u.username = $' + params.length); }
+    if (req.query.from) { params.push(req.query.from); cond.push('m.ts >= $' + params.length); }
+    if (req.query.to) { params.push(req.query.to); cond.push('m.ts <= $' + params.length); }
+    if (req.query.q) { params.push('%' + req.query.q + '%'); cond.push('m.ssid ILIKE $' + params.length); }
+
+    const where = cond.length ? ' WHERE ' + cond.join(' AND ') : '';
+    params.push(limit, offset);
+    const pageSql = `SELECT m.id, u.username, m.bssid, m.ssid, m.latitude, m.longitude,
+                        m.rssi, m.ts
+                     FROM measurements m JOIN users u ON u.id = m.user_id
+                     ${where} ORDER BY m.ts DESC LIMIT $${params.length - 1}
+                     OFFSET $${params.length}`;
+    const cntSql = `SELECT COUNT(*)::int n
+                    FROM measurements m JOIN users u ON u.id = m.user_id ${where}`;
+
+    const [rows, cnt] = await Promise.all([pool.query(pageSql, params), pool.query(cntSql, params.slice(0, params.length - 2))]);
+    res.json({ total: cnt.rows[0].n, offset, limit, rows: rows.rows });
   } catch (e) {
+    console.error('[api] error mediciones admin:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });

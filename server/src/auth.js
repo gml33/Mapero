@@ -78,6 +78,46 @@ export async function requireAuth(req, res, next) {
   }
 }
 
+/** Crea un usuario con rol (uso desde el panel admin). */
+export async function createUser(username, password, role = 'user') {
+  const name = String(username).trim().slice(0, 30);
+  if (!name || !password || password.length < 3) {
+    const e = new Error('Usuario o contraseña inválidos');
+    e.status = 400;
+    throw e;
+  }
+  const hash = await bcrypt.hash(password, ROUNDS);
+  try {
+    const r = await pool.query(
+      `INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)
+       RETURNING id, username, role`, [name, hash, role]);
+    return r.rows[0];
+  } catch (e) {
+    if (e.code === '23505') {
+      const err = new Error('El usuario ya existe');
+      err.status = 409;
+      throw err;
+    }
+    throw e;
+  }
+}
+
+/** Cambia el rol de un usuario. */
+export async function setUserRole(id, role) {
+  await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+}
+
+/** Cambia la contraseña de un usuario. */
+export async function setUserPassword(id, password) {
+  if (!password || password.length < 3) {
+    const e = new Error('Contraseña demasiado corta');
+    e.status = 400;
+    throw e;
+  }
+  const hash = await bcrypt.hash(password, ROUNDS);
+  await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, id]);
+}
+
 /** Middleware: requiere sesión válida y rol de administrador. */
 export async function requireAdmin(req, res, next) {
   await requireAuth(req, res, () => {

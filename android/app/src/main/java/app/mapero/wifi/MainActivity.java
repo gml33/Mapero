@@ -97,6 +97,11 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private static final double TERRITORY_RADIUS_M = 75.0;
 
+    // Filtros de red: tipo (0 todas, 1 abiertas, 2 protegidas), banda (0,1,2), señal mínima dBm
+    private int filterType = 0;
+    private int filterBand = 0;
+    private int filterMinSignal = -200;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -531,12 +536,24 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         int shown = 0;
         for (WifiApSummary ap : sorted) {
             Marker marker = markerByBssid.get(ap.bssid);
-            if (marker != null) {
-                marker.setEnabled(shown < maxToShow);
+            if (marker == null) continue;
+            if (!matchesFilters(ap)) {
+                marker.setEnabled(false);
+            } else {
+                shown++;
+                marker.setEnabled(shown <= maxToShow);
             }
-            shown++;
         }
         mapView.invalidate();
+    }
+
+    private boolean matchesFilters(WifiApSummary ap) {
+        if (filterType == 1 && !ap.open) return false;
+        if (filterType == 2 && ap.open) return false;
+        if (filterBand == 1 && ap.band != 1) return false;
+        if (filterBand == 2 && ap.band != 2) return false;
+        if (ap.avgRssi < filterMinSignal) return false;
+        return true;
     }
 
     private int countForZoom(double zoom) {
@@ -634,8 +651,69 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         } else if (id == R.id.action_server) {
             showServerDialog();
             return true;
+        } else if (id == R.id.action_filter) {
+            showFilterDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showFilterDialog() {
+        android.widget.Spinner type = new android.widget.Spinner(this);
+        android.widget.Spinner band = new android.widget.Spinner(this);
+        android.widget.Spinner signal = new android.widget.Spinner(this);
+
+        android.widget.ArrayAdapter<CharSequence> ta =
+                android.widget.ArrayAdapter.createFromResource(this,
+                        R.array.filter_type, android.R.layout.simple_spinner_dropdown_item);
+        android.widget.ArrayAdapter<CharSequence> ba =
+                android.widget.ArrayAdapter.createFromResource(this,
+                        R.array.filter_band, android.R.layout.simple_spinner_dropdown_item);
+        android.widget.ArrayAdapter<CharSequence> sa =
+                android.widget.ArrayAdapter.createFromResource(this,
+                        R.array.filter_signal, android.R.layout.simple_spinner_dropdown_item);
+        type.setAdapter(ta);
+        band.setAdapter(ba);
+        signal.setAdapter(sa);
+
+        type.setSelection(filterType);
+        band.setSelection(filterBand);
+        int sigIdx = filterMinSignal == -200 ? 0
+                : (filterMinSignal == -80 ? 1 : (filterMinSignal == -70 ? 2 : 3));
+        signal.setSelection(sigIdx);
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        layout.setPadding(pad, pad, pad, 0);
+        layout.addView(label("Tipo de red"));
+        layout.addView(type);
+        layout.addView(label("Banda"));
+        layout.addView(band);
+        layout.addView(label("Señal mínima"));
+        layout.addView(signal);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Filtros de red")
+                .setView(layout)
+                .setPositiveButton("Aplicar", (d, w) -> {
+                    filterType = type.getSelectedItemPosition();
+                    filterBand = band.getSelectedItemPosition();
+                    int[] sigVals = {-200, -80, -70, -60};
+                    filterMinSignal = sigVals[signal.getSelectedItemPosition()];
+                    applyZoomFilter();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private android.widget.TextView label(String text) {
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(text);
+        tv.setTextSize(13);
+        tv.setTextColor(0xFF666666);
+        tv.setPadding(0, (int) (12 * getResources().getDisplayMetrics().density), 0, 4);
+        return tv;
     }
 
     private void showServerDialog() {

@@ -12,4 +12,8 @@ public class WifiApSummary {
     public double avgLatitude;
     public double avgLongitude;
     public int samples;
+    /** true si la red es abierta (sin cifrado). */
+    public boolean open;
+    /** 1 = 2,4 GHz, 2 = 5 GHz, 0 = desconocida. */
+    public int band;
 }

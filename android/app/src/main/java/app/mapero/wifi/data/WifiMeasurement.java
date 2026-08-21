@@ -32,6 +32,9 @@ public class WifiMeasurement {
     @ColumnInfo(name = "frequency")
     public int frequency;
 
+    @ColumnInfo(name = "capabilities")
+    public String capabilities;
+
     @ColumnInfo(name = "timestamp")
     public long timestamp;
 }

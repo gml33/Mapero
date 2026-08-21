@@ -188,6 +188,7 @@ public class WifiScanner {
                 m.longitude = loc.getLongitude();
                 m.rssi = smoothRssi(bssid, r.level);
                 m.frequency = r.frequency;
+                m.capabilities = r.capabilities;
                 m.timestamp = System.currentTimeMillis();
                 batch.add(m);
             }

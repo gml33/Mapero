@@ -12,4 +12,21 @@
     <string name="follow_off">Seguir: OFF</string>
     <string name="start">Iniciar mapeo</string>
     <string name="stop">Detener</string>
+
+    <string-array name="filter_type">
+        <item>Todas</item>
+        <item>Abiertas</item>
+        <item>Protegidas</item>
+    </string-array>
+    <string-array name="filter_band">
+        <item>Todas</item>
+        <item>2,4 GHz</item>
+        <item>5 GHz</item>
+    </string-array>
+    <string-array name="filter_signal">
+        <item>Todas</item>
+        <item>&gt;= -80 dBm</item>
+        <item>&gt;= -70 dBm</item>
+        <item>&gt;= -60 dBm</item>
+    </string-array>
 </resources>

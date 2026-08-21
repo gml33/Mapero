@@ -87,6 +87,15 @@ public final class SignalAggregator {
             acc.samplesList.add(m);
             acc.rssiSum += m.rssi;
             acc.count++;
+            if (isOpenNetwork(m.capabilities)) {
+                acc.openCount++;
+            } else {
+                acc.securedCount++;
+            }
+            if (m.frequency > 0) {
+                if (m.frequency < 3000) acc.band24++;
+                else acc.band5++;
+            }
         }
 
         List<WifiApSummary> out = new ArrayList<>(accMap.size());
@@ -109,9 +118,19 @@ public final class SignalAggregator {
                 }
             }
             s.samples = Math.toIntExact(acc.count);
+            s.open = acc.openCount > 0 && acc.openCount >= acc.securedCount;
+            s.band = acc.band5 >= acc.band24 ? (acc.band5 > 0 ? 2 : 0) : 1;
             out.add(s);
         }
         return out;
+    }
+
+    /** Una red es abierta si sus capabilities no indican cifrado. */
+    private static boolean isOpenNetwork(String caps) {
+        if (caps == null || caps.isEmpty()) return true;
+        return !caps.contains("WPA") && !caps.contains("WEP")
+                && !caps.contains("RSN") && !caps.contains("SAE")
+                && !caps.contains("PSK");
     }
 
     private static WifiMeasurement bestSample(List<WifiMeasurement> samples) {
@@ -188,6 +207,10 @@ public final class SignalAggregator {
         double latSum;
         double lonSum;
         String ssid;
+        int openCount;
+        int securedCount;
+        int band24;
+        int band5;
         List<WifiMeasurement> samplesList;
     }
 }

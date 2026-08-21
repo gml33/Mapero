@@ -54,18 +54,16 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 
 ---
 
-## 5. Filtros de tipos de red
-- Filtrar las redes que se muestran en el mapa según su tipo/seguridad:
-  - **Abiertas / sin autenticación / libres** (sin cifrado).
-  - **Protegidas** (WPA/WPA2/WPA3, etc.).
-  - Por banda o frecuencia (2,4 GHz / 5 GHz).
-  - Por intensidad de señal mínima.
-- El filtro se combina con el filtrado por zoom ya existente.
+## 5. ✅ Filtros de tipos de red — implementados
+- Menú **Filtros** en la app con:
+  - **Tipo**: Todas / **Abiertas** (sin cifrado) / **Protegidas**.
+  - **Banda**: Todas / 2,4 GHz / 5 GHz.
+  - **Señal mínima**: Todas / ≥ -80 / ≥ -70 / ≥ -60 dBm.
+- Se guardan las `capabilities` de `ScanResult` (migración Room v1→v2) y cada red se clasifica como abierta/protegida y por banda.
+- El filtro se combina con el filtrado por zoom ya existente (se aplican sobre los marcadores visibles).
 
-### Consideraciones
-- Determinar el tipo de red a partir de `ScanResult` (capabilities: `[WPA*]`, `[WEP]`, sin flags = abierta).
-- Hoy la entidad `measurements` no guarda las `capabilities`; habría que añadir el campo y migrar la base (nuevo `version` de Room).
-- Aplicar el filtro en la agregación/UI, no solo al renderizar, para que también afecte exportaciones y conteos.
+### Pendientes
+- Aplicar el filtro también a exportaciones y conteos (hoy solo afecta el mapa).
 
 ## 6. Búsqueda de redes por nombre
 - Campo de búsqueda donde se escribe el **nombre (SSID)** de una red.

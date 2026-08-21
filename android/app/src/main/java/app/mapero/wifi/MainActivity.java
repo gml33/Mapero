@@ -594,36 +594,67 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
                 | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         urlInput.setText(config.serverUrl);
 
-        android.widget.EditText keyInput = new android.widget.EditText(this);
-        keyInput.setHint("API key");
-        keyInput.setText(config.apiKey);
+        android.widget.EditText userInput = new android.widget.EditText(this);
+        userInput.setHint("Usuario");
+        userInput.setText(config.username);
 
-        android.widget.EditText playerInput = new android.widget.EditText(this);
-        playerInput.setHint("Nombre de jugador");
-        playerInput.setText(config.playerName);
+        android.widget.EditText passInput = new android.widget.EditText(this);
+        passInput.setHint("Contraseña");
+        passInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        passInput.setText(config.password);
 
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
         layout.setPadding(pad, pad, pad, 0);
         layout.addView(urlInput);
-        layout.addView(keyInput);
-        layout.addView(playerInput);
+        layout.addView(userInput);
+        layout.addView(passInput);
 
+        String status = config.hasToken()
+                ? "Sesión activa como \"" + config.username + "\"."
+                : "Sin sesión. Conectate para subir datos.";
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-                .setTitle("Servidor remoto")
-                .setMessage("Dónde subir los datos y tu nombre de jugador (para la conquista).")
+                .setTitle("Conectar al servidor")
+                .setMessage(status)
                 .setView(layout)
-                .setPositiveButton("Guardar", (d, w) -> {
-                    ServerConfig c = new ServerConfig();
-                    c.serverUrl = urlInput.getText().toString().trim();
-                    c.apiKey = keyInput.getText().toString().trim();
-                    c.playerName = playerInput.getText().toString().trim();
-                    c.save(this);
-                    android.widget.Toast.makeText(this, "Servidor guardado", Toast.LENGTH_SHORT).show();
+                .setPositiveButton("Conectar", (d, w) -> {
+                    String url = urlInput.getText().toString().trim();
+                    String user = userInput.getText().toString().trim();
+                    String pass = passInput.getText().toString();
+                    connect(url, user, pass);
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
+    }
+
+    private void connect(final String url, final String user, final String pass) {
+        if (url.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+            Toast.makeText(this, "Completá URL, usuario y contraseña", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(this, "Conectando…", Toast.LENGTH_SHORT).show();
+        ioExecutor.execute(() -> {
+            try {
+                String token = AuthClient.loginOrRegister(url, user, pass);
+                ServerConfig c = new ServerConfig();
+                c.serverUrl = url;
+                c.username = user;
+                c.password = pass;
+                c.token = token;
+                c.streaming = true;
+                c.save(MainActivity.this);
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this,
+                            "Conectado como \"" + user + "\"", Toast.LENGTH_LONG).show();
+                    updateStreamButton();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                        "No se pudo conectar: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void showCalibrationDialog() {

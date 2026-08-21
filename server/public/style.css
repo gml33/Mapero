@@ -22,6 +22,10 @@ header h1 { font-size: 18px; font-weight: 700; }
 .status.online { background: #2e7d32; }
 .status.offline { background: #c62828; }
 .count { font-size: 13px; }
+.btn {
+  background: #fff; color: #00695c; border: none; border-radius: 14px;
+  padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
 .last { margin-left: auto; font-size: 12px; opacity: 0.9; }
 
 #ranking {

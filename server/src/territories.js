@@ -11,18 +11,18 @@ const TAU_MS = 7 * 24 * 3600 * 1000;
  * decae exponencialmente con su antigüedad; el dueño es el dispositivo con más
  * peso acumulado (empates se resuelven por actividad más reciente).
  *
- * rows: [{ device_id, name, latitude, longitude, ts }]
+ * rows: [{ user_id, name, latitude, longitude, ts }]
  */
 export function buildTerritories(rows, now = Date.now()) {
-  const score = new Map(); // `${hex}|${deviceId}` -> acc
+  const score = new Map(); // `${hex}|${userId}` -> acc
 
   for (const r of rows) {
     const hex = latLngToCell(r.latitude, r.longitude, HEX_RES);
     const age = now - new Date(r.ts).getTime();
     const w = Math.exp(-age / TAU_MS);
-    const key = hex + '|' + r.device_id;
+    const key = hex + '|' + r.user_id;
     const acc = score.get(key) || {
-      hex, deviceId: r.device_id, name: r.name, score: 0, count: 0, lastTs: 0,
+      hex, userId: r.user_id, name: r.name, score: 0, count: 0, lastTs: 0,
     };
     acc.score += w;
     acc.count++;

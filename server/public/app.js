@@ -113,7 +113,6 @@ function esc(s) {
 // ---- Juego de conquista (territorios) ----
 
 let territoryLayer = L.layerGroup().addTo(map);
-let rankingByOwner = new Map();
 
 function colorForOwner(name) {
   let h = 0;
@@ -126,45 +125,90 @@ async function loadTerritories() {
     const res = await fetch('/api/territories');
     const data = await res.json();
     territoryLayer.clearLayers();
-    rankingByOwner = new Map();
 
     for (const t of data) {
       const color = colorForOwner(t.owner);
       const boundary = h3.cellToBoundary(t.hex, true); // [lng,lat]
-      const poly = L.polygon(boundary.map(p => [p[1], p[0]]), {
+      L.polygon(boundary.map(p => [p[1], p[0]]), {
         color: color, weight: 1, fillColor: color, fillOpacity: 0.45,
       }).addTo(territoryLayer)
         .bindPopup(`<b>${esc(t.owner)}</b><br>cobertura: ${t.score}<br>${t.count} muestras`);
-
-      const acc = rankingByOwner.get(t.owner) || { owner: t.owner, n: 0, score: 0 };
-      acc.n++;
-      acc.score += t.score;
-      rankingByOwner.set(t.owner, acc);
     }
-
-    renderRanking();
   } catch (e) {
     console.error('error territorios', e);
   }
 }
 
-function renderRanking() {
-  const list = [...rankingByOwner.values()].sort((a, b) => b.score - a.score);
-  const el = document.getElementById('rankingList');
-  el.innerHTML = list.map(r =>
-    `<li><span class="chip" style="background:${colorForOwner(r.owner)}"></span>` +
-    `<span class="name">${esc(r.owner)}</span><span class="n">${r.n} cel · ${Math.round(r.score)}</span></li>`
-  ).join('') || '<li>Sin territorios aún</li>';
+// ---- Leaderboard (desde el servidor) ----
+async function loadLeaderboard() {
+  try {
+    const res = await fetch('/api/leaderboard');
+    const data = await res.json();
+    const el = document.getElementById('rankingList');
+    el.innerHTML = data.map(r =>
+      `<li><span class="chip" style="background:${colorForOwner(r.username)}"></span>` +
+      `<span class="name">${r.rank}. ${esc(r.username)}</span>` +
+      `<span class="n">${r.cells} cel · ${Math.round(r.coverage)}</span></li>`
+    ).join('') || '<li>Sin territorios aún</li>';
+  } catch (e) {
+    console.error('error leaderboard', e);
+  }
 }
 
+// ---- Autenticación (web) ----
+let authToken = localStorage.getItem('mapero_token') || '';
+const loginBtn = document.getElementById('loginBtn');
+function updateAuthUi() {
+  if (authToken) {
+    loginBtn.textContent = localStorage.getItem('mapero_user') || 'Sesión';
+  } else {
+    loginBtn.textContent = 'Entrar';
+  }
+}
+loginBtn.onclick = async () => {
+  const user = prompt('Usuario:');
+  if (!user) return;
+  const pass = prompt('Contraseña (si no existe el usuario, se crea):');
+  if (!pass) return;
+  try {
+    let res = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass }),
+    });
+    if (!res.ok) {
+      res = await fetch('/api/auth/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pass }),
+      });
+    }
+    const data = await res.json();
+    if (data.token) {
+      authToken = data.token;
+      localStorage.setItem('mapero_token', data.token);
+      localStorage.setItem('mapero_user', user);
+      updateAuthUi();
+      loadLeaderboard();
+    } else {
+      alert('No se pudo conectar');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+};
+updateAuthUi();
+
 let terrTimer = null;
-function scheduleTerritories() {
+function scheduleRefresh() {
   clearTimeout(terrTimer);
-  terrTimer = setTimeout(loadTerritories, 800);
+  terrTimer = setTimeout(() => {
+    loadTerritories();
+    loadLeaderboard();
+  }, 800);
 }
 
 centerOnLastPosition();
 loadInitial();
 loadTerritories();
-setInterval(loadTerritories, 30000); // refresco periódico
+loadLeaderboard();
+setInterval(() => { loadTerritories(); loadLeaderboard(); }, 30000);
 connect();

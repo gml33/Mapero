@@ -9,16 +9,22 @@ export const pool = new Pool({
 });
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS devices (
-  id          SERIAL PRIMARY KEY,
-  api_key     TEXT NOT NULL,
-  name        TEXT UNIQUE NOT NULL,
+CREATE TABLE IF NOT EXISTS users (
+  id            SERIAL PRIMARY KEY,
+  username      TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token       TEXT PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS measurements (
   id          BIGSERIAL PRIMARY KEY,
-  device_id   INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   bssid       TEXT NOT NULL,
   ssid        TEXT NOT NULL DEFAULT '',
   latitude    DOUBLE PRECISION NOT NULL,
@@ -31,9 +37,7 @@ CREATE TABLE IF NOT EXISTS measurements (
 
 CREATE INDEX IF NOT EXISTS idx_measurements_ts ON measurements (ts);
 CREATE INDEX IF NOT EXISTS idx_measurements_ssid ON measurements (ssid);
-
--- Identidad del juego: un jugador por nombre (para competir individualmente)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_name ON devices (name);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
 `;
 
 export async function initDb() {

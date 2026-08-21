@@ -44,6 +44,7 @@ public class Uploader {
     private void send(List<WifiMeasurement> batch) throws Exception {
         ServerConfig config = ServerConfig.load(context);
         if (config.serverUrl == null || config.serverUrl.isEmpty()) return;
+        if (!config.hasToken()) return; // sin sesión no se puede subir
 
         JSONArray arr = new JSONArray();
         for (WifiMeasurement m : batch) {
@@ -68,10 +69,7 @@ public class Uploader {
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("x-api-key", config.apiKey);
-            if (config.playerName != null && !config.playerName.isEmpty()) {
-                conn.setRequestProperty("x-device-name", config.playerName);
-            }
+            conn.setRequestProperty("Authorization", "Bearer " + config.token);
             conn.setDoOutput(true);
 
             byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);

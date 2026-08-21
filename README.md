@@ -13,7 +13,8 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 - **Intervalo de escaneo adaptativo por velocidad**: a mayor velocidad, más escaneos por minuto.
 - **Autocentrado del mapa**: al abrir la app centra en tu posición y solo después activa el seguimiento.
 - **Streaming opcional**: botón para alternar entre subir los datos en tiempo real al servidor (web en vivo) o almacenarlos solo en el dispositivo.
-- **Juego de conquista**: hexágonos que se conquistan por cobertura (con decaimiento); territorios coloreados por dueño en web y app, con ranking.
+- **Cuentas y login**: registro/inicio de sesión por usuario (bcrypt + token), en la app y en la web.
+- **Juego de conquista**: hexágonos que se conquistan por cobertura (con decaimiento); territorios coloreados por dueño en web y app, con leaderboard y ranking.
 - **Agrupación por red (SSID)**: fusiona en un punto todas las antenas del mismo nombre.
 - **Trilateración multiseñal** por mínimos cuadrados (Gauss-Newton) con modelo de propagación log-distance.
 - **Menú de calibración**: ajusta la potencia de referencia y el exponente de pérdida para mejorar la precisión según el entorno.

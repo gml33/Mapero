@@ -11,25 +11,26 @@ import android.content.SharedPreferences;
 public final class ServerConfig {
 
     public static final String DEFAULT_URL = "http://192.168.0.12:8080";
-    public static final String DEFAULT_API_KEY = "mapero_dev_key";
-    public static final String DEFAULT_PLAYER_NAME = "jugador";
 
     private static final String PREFS = "server";
     private static final String KEY_URL = "serverUrl";
-    private static final String KEY_KEY = "apiKey";
-    private static final String KEY_PLAYER = "playerName";
+    private static final String KEY_USER = "username";
+    private static final String KEY_PASS = "password";
+    private static final String KEY_TOKEN = "token";
     private static final String KEY_STREAMING = "streaming";
 
     public String serverUrl;
-    public String apiKey;
-    public String playerName;
+    public String username;
+    public String password;
+    public String token;
     /** Si true, sube los datos en tiempo real al servidor; si false, solo local. */
     public boolean streaming;
 
     public ServerConfig() {
         serverUrl = DEFAULT_URL;
-        apiKey = DEFAULT_API_KEY;
-        playerName = DEFAULT_PLAYER_NAME;
+        username = "";
+        password = "";
+        token = "";
         streaming = true;
     }
 
@@ -37,8 +38,9 @@ public final class ServerConfig {
         ServerConfig c = new ServerConfig();
         SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         c.serverUrl = sp.getString(KEY_URL, DEFAULT_URL);
-        c.apiKey = sp.getString(KEY_KEY, DEFAULT_API_KEY);
-        c.playerName = sp.getString(KEY_PLAYER, DEFAULT_PLAYER_NAME);
+        c.username = sp.getString(KEY_USER, "");
+        c.password = sp.getString(KEY_PASS, "");
+        c.token = sp.getString(KEY_TOKEN, "");
         c.streaming = sp.getBoolean(KEY_STREAMING, true);
         return c;
     }
@@ -47,9 +49,14 @@ public final class ServerConfig {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_URL, serverUrl)
-                .putString(KEY_KEY, apiKey)
-                .putString(KEY_PLAYER, playerName)
+                .putString(KEY_USER, username)
+                .putString(KEY_PASS, password)
+                .putString(KEY_TOKEN, token)
                 .putBoolean(KEY_STREAMING, streaming)
                 .apply();
+    }
+
+    public boolean hasToken() {
+        return token != null && !token.isEmpty();
     }
 }

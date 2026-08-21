@@ -68,9 +68,12 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `POST` | `/api/measurements` | `x-api-key` | Ingresa mediciones (array o `{measurements:[...]}`). Emite broadcast por WS. |
-| `GET` | `/api/networks` | — | Redes agregadas (para la carga inicial de la web). |
-| `GET` | `/api/territories` | — | Hexágonos (H3) conquistados y su dueño (juego de conquista). |
+| `POST` | `/api/auth/register` | — | Crea usuario (`{username, password}`) → `{token, username}`. |
+| `POST` | `/api/auth/login` | — | Inicia sesión → `{token, username}`. |
+| `POST` | `/api/measurements` | `Bearer` | Ingresa mediciones del usuario autenticado. Emite broadcast por WS. |
+| `GET` | `/api/networks` | — | Redes agregadas (carga inicial de la web). |
+| `GET` | `/api/territories` | — | Hexágonos (H3) conquistados y su dueño. |
+| `GET` | `/api/leaderboard` | — | Ranking de conquistas por jugador. |
 | `GET` | `/api/last-position` | — | Última posición medida (centrado inicial). |
 | `GET` | `/health` | — | Estado. |
 | `WS` | `/ws` | — | Emite `{type:"measurements", data:[...]}` en tiempo real. |
@@ -90,6 +93,9 @@ Abrir `http://localhost:8080` en el navegador. La página:
 - Carga las redes iniciales desde `/api/networks`.
 - Se conecta a `/ws` y pinta en vivo cada medición entrante (centroide ponderado por señal, coloreado por intensidad).
 - Muestra la **fecha de la última actualización** y el conteo de redes.
+
+## Autenticación
+Registro/Login por usuario (hash **bcrypt**) que devuelve un **token de sesión**. Las peticiones de escritura llevan `Authorization: Bearer <token>`. La identidad del jugador es su **usuario**, y a él se atribuyen las mediciones, la conquista y el leaderboard.
 
 ## Juego de conquista
 La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su dueño. La posesión se calcula con **cobertura + decaimiento**: cada medición suma un peso que decae exponencialmente (~7 días); el dueño de un hexágono es el jugador con más cobertura acumulada. La identidad de cada jugador es su **nombre** (`x-device-name`).

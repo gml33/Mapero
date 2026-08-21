@@ -15,10 +15,11 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 - Política de uso razonable del backend (límites de requests).
 
 ## 2. ✅ API para subir y compartir datos en tiempo real entre dispositivos (v1 implementada)
-- **Ingesta**: `POST /api/measurements` (con `x-api-key`), ya usada por la app Android.
+- **Ingesta**: `POST /api/measurements` (requiere sesión), ya usada por la app Android.
 - **Consulta**: `GET /api/networks` (redes agregadas) para la carga inicial de la web.
 - **Tiempo real**: WebSocket `/ws` que transmite cada ingesta a todos los clientes conectados.
-- Pendientes: sincronización incremental (timestamp/offset), auth por dispositivo, `GET /networks/{id}`, paginación y filtros.
+- **Autenticación**: registro/login por usuario (bcrypt) con **token de sesión** (`Authorization: Bearer`).
+- Pendientes: sincronización incremental (timestamp/offset), `GET /networks/{id}`, paginación y filtros.
 
 ### Consideraciones
 - Autenticación por token/API key por usuario o dispositivo.
@@ -39,11 +40,13 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 - Regla **cobertura + decaimiento**: por celda, cada medición aporta un peso que decae con el tiempo (~7 días); el dueño es quien más cobertura acumulada tiene.
 - Competencia **individual**: cada jugador se identifica por nombre (`x-device-name`).
 - Endpoint `GET /api/territories` (dueño de cada hexágono + score).
-- **Web**: hexágonos coloreados por dueño (H3) + panel de ranking.
-- **App**: nombre de jugador (menú Servidor) y superposición de territorios en el mapa.
+- Endpoint `GET /api/leaderboard` (ranking de conquistas por jugador).
+- **Autenticación** por usuario (login/registro con token) — identidad establecida.
+- **Web**: hexágonos coloreados por dueño (H3) + panel de ranking/leaderboard + login.
+- **App**: conexión/login (menú Servidor) y superposición de territorios en el mapa.
 
 ### Pendientes / ideas
-- Autenticación real por jugador (token) y anti-cheat.
+- Anti-cheat y validación de datos por usuario.
 - Decaimiento configurable y "guerra" por defensa de territorios.
 - Detalle de celdas vecinas y "frentes" entre jugadores.
 

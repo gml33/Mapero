@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool, initDb } from './db.js';
 import { buildTerritories } from './territories.js';
+import { register, login, requireAuth } from './auth.js';
 
 dotenv.config();
 
@@ -21,17 +22,27 @@ app.use(express.json({ limit: '1mb' }));
 // ---- Servir la página web ----
 app.use(express.static(path.join(__dirname, '../public')));
 
-// ---- Auth de escritura ----
-function checkKey(req, res, next) {
-  const key = req.headers['x-api-key'];
-  if (key !== API_KEY) {
-    return res.status(401).json({ error: 'API key inválida' });
+// ---- Autenticación ----
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { token, username } = await register(req.body?.username, req.body?.password);
+    res.status(201).json({ token, username });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
   }
-  next();
-}
+});
 
-// ---- Ingesta de mediciones ----
-app.post('/api/measurements', checkKey, async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { token, username } = await login(req.body?.username, req.body?.password);
+    res.json({ token, username });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// ---- Ingesta de mediciones (requiere sesión) ----
+app.post('/api/measurements', requireAuth, async (req, res) => {
   const list = Array.isArray(req.body) ? req.body
     : Array.isArray(req.body?.measurements) ? req.body.measurements : null;
 
@@ -48,22 +59,14 @@ app.post('/api/measurements', checkKey, async (req, res) => {
   }
 
   try {
-    // Auto-registro del jugador según su nombre (identidad de la competencia).
-    const playerName = (req.headers['x-device-name'] || 'jugador').slice(0, 40);
-    const dev = await pool.query(
-      'INSERT INTO devices (name, api_key) VALUES ($1, $2) ' +
-      'ON CONFLICT (name) DO UPDATE SET api_key = EXCLUDED.api_key ' +
-      'RETURNING id', [playerName, API_KEY]);
-    const deviceId = dev.rows[0].id;
-
     const inserted = [];
     for (const m of valid) {
       const r = await pool.query(
         `INSERT INTO measurements
-           (device_id, bssid, ssid, latitude, longitude, rssi, frequency, ts)
+           (user_id, bssid, ssid, latitude, longitude, rssi, frequency, ts)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          RETURNING bssid, ssid, latitude, longitude, rssi, frequency, ts`,
-        [deviceId, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
+        [req.user.id, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
          m.frequency || null, new Date(m.timestamp || Date.now())]);
       inserted.push(r.rows[0]);
     }
@@ -101,13 +104,39 @@ app.get('/api/networks', async (_req, res) => {
 app.get('/api/territories', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT m.device_id, d.name, m.latitude, m.longitude, m.ts
+      `SELECT m.user_id, u.username AS name, m.latitude, m.longitude, m.ts
        FROM measurements m
-       JOIN devices d ON d.id = m.device_id
+       JOIN users u ON u.id = m.user_id
        WHERE m.ts > now() - interval '30 days'`);
-    res.json(buildTerritories(rows));
+    const territories = buildTerritories(rows);
+    res.json(territories);
   } catch (e) {
     console.error('[api] error territories:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// ---- Leaderboard (conquistas por jugador) ----
+app.get('/api/leaderboard', async (_req, res) => {
+  try {
+    // Se calcula con el mismo modelo de territorios para no duplicar lógica.
+    const terr = await pool.query(
+      `SELECT m.user_id, u.username AS name, m.latitude, m.longitude, m.ts
+       FROM measurements m JOIN users u ON u.id = m.user_id
+       WHERE m.ts > now() - interval '30 days'`);
+    const territories = buildTerritories(terr.rows);
+
+    const perUser = new Map();
+    for (const t of territories) {
+      const acc = perUser.get(t.owner) || { username: t.owner, cells: 0, coverage: 0 };
+      acc.cells++;
+      acc.coverage += t.score;
+      perUser.set(t.owner, acc);
+    }
+    const list = [...perUser.values()].sort((a, b) => b.coverage - a.coverage);
+    res.json(list.map((u, i) => ({ rank: i + 1, ...u })));
+  } catch (e) {
+    console.error('[api] error leaderboard:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });

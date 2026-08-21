@@ -132,15 +132,30 @@ async function setRole(id, role) {
 }
 async function changePass(id) {
   const pass = $('pass_' + id).value;
-  if (!pass) return alert('Escribí una contraseña');
-  await api('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ password: pass }) });
-  alert('Contraseña actualizada');
-  $('pass_' + id).value = '';
+  if (!pass) return Swal.fire({ icon: 'warning', title: 'Falta la contraseña', text: 'Escribí una contraseña nueva' });
+  try {
+    await api('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ password: pass }) });
+    $('pass_' + id).value = '';
+    Swal.fire({ icon: 'success', title: 'Listo', text: 'Contraseña actualizada', timer: 1500, showConfirmButton: false });
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+  }
 }
 async function delUser(id) {
-  if (!confirm('¿Borrar este usuario y sus datos?')) return;
-  await api('/api/admin/users/' + id, { method: 'DELETE' });
-  renderUsers();
+  const r = await Swal.fire({
+    icon: 'warning', title: '¿Borrar este usuario?',
+    text: 'Se eliminarán también sus datos.',
+    showCancelButton: true, confirmButtonText: 'Borrar', cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#c62828',
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await api('/api/admin/users/' + id, { method: 'DELETE' });
+    renderUsers();
+    Swal.fire({ icon: 'success', title: 'Borrado', timer: 1200, showConfirmButton: false });
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+  }
 }
 
 let meas = { offset: 0, limit: 50, filters: {}, sort: 'ts', dir: 'desc' };
@@ -240,9 +255,20 @@ function resetFilters() {
 }
 
 async function clearMeasurements() {
-  if (!confirm('¿Borrar TODAS las mediciones?')) return;
-  await api('/api/admin/measurements', { method: 'DELETE' });
-  loadMeasurements();
+  const r = await Swal.fire({
+    icon: 'warning', title: '¿Borrar TODAS las mediciones?',
+    text: 'Esta acción no se puede deshacer.',
+    showCancelButton: true, confirmButtonText: 'Borrar todo', cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#c62828',
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await api('/api/admin/measurements', { method: 'DELETE' });
+    loadMeasurements();
+    Swal.fire({ icon: 'success', title: 'Borradas', timer: 1200, showConfirmButton: false });
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+  }
 }
 
 async function renderConfig() {
@@ -264,8 +290,12 @@ async function renderConfig() {
     e.preventDefault();
     const patch = {};
     for (const k of Object.keys(s)) patch[k] = $(k).value;
-    await api('/api/config', { method: 'PUT', body: JSON.stringify(patch) });
-    alert('Configuración guardada');
+    try {
+      await api('/api/config', { method: 'PUT', body: JSON.stringify(patch) });
+      Swal.fire({ icon: 'success', title: 'Guardado', text: 'Configuración aplicada', timer: 1500, showConfirmButton: false });
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+    }
   };
 }
 

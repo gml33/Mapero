@@ -313,13 +313,21 @@ app.get('/api/admin/measurements', requireAdmin, async (req, res) => {
     if (req.query.from) { params.push(req.query.from); cond.push('m.ts >= $' + params.length); }
     if (req.query.to) { params.push(req.query.to); cond.push('m.ts <= $' + params.length); }
     if (req.query.q) { params.push('%' + req.query.q + '%'); cond.push('m.ssid ILIKE $' + params.length); }
+    if (req.query.mac) { params.push('%' + req.query.mac + '%'); cond.push('m.bssid ILIKE $' + params.length); }
 
     const where = cond.length ? ' WHERE ' + cond.join(' AND ') : '';
+
+    // Ordenamiento: whitelist de columnas para evitar inyección SQL.
+    const SORT = { id: 'm.id', username: 'u.username', bssid: 'm.bssid',
+      ssid: 'm.ssid', rssi: 'm.rssi', ts: 'm.ts' };
+    const sortCol = SORT[req.query.sort] || 'm.ts';
+    const dir = String(req.query.dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
     params.push(limit, offset);
     const pageSql = `SELECT m.id, u.username, m.bssid, m.ssid, m.latitude, m.longitude,
                         m.rssi, m.ts
                      FROM measurements m JOIN users u ON u.id = m.user_id
-                     ${where} ORDER BY m.ts DESC LIMIT $${params.length - 1}
+                     ${where} ORDER BY ${sortCol} ${dir}, m.id ${dir} LIMIT $${params.length - 1}
                      OFFSET $${params.length}`;
     const cntSql = `SELECT COUNT(*)::int n
                     FROM measurements m JOIN users u ON u.id = m.user_id ${where}`;

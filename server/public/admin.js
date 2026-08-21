@@ -63,7 +63,7 @@ function renderAll(view) {
   $('who').textContent = localStorage.getItem('mapero_user') || '';
   if (view === 'stats') renderStats();
   if (view === 'users') renderUsers();
-  if (view === 'measurements') renderMeasurements();
+  if (view === 'measurements') loadMeasurements();
   if (view === 'config') renderConfig();
 }
 
@@ -143,11 +143,12 @@ async function delUser(id) {
   renderUsers();
 }
 
-let meas = { offset: 0, limit: 50, filters: {} };
+let meas = { offset: 0, limit: 50, filters: {}, sort: 'ts', dir: 'desc' };
 
 async function loadMeasurements() {
-  const p = new URLSearchParams({ limit: meas.limit, offset: meas.offset });
-  for (const k of ['user', 'from', 'to', 'q']) {
+  const p = new URLSearchParams({ limit: meas.limit, offset: meas.offset,
+    sort: meas.sort, dir: meas.dir });
+  for (const k of ['user', 'from', 'to', 'q', 'mac']) {
     if (meas.filters[k]) p.set(k, meas.filters[k]);
   }
   const d = await api('/api/admin/measurements?' + p.toString());
@@ -157,13 +158,19 @@ async function loadMeasurements() {
 async function renderMeasurements(d) {
   const pages = Math.ceil(d.total / d.limit) || 1;
   const page = Math.floor(d.offset / d.limit) + 1;
+  const users = await api('/api/admin/users');
+  const userOptions = '<option value="">Todos</option>' + users
+    .map((u) => `<option value="${esc(u.username)}" ${meas.filters.user === u.username ? 'selected' : ''}>${esc(u.username)}</option>`)
+    .join('');
   $('view-measurements').innerHTML = `
     <div class="card"><h2>Filtros</h2>
       <form id="filtersForm">
-        <field><label>Usuario</label><input id="f_user" value="${esc(meas.filters.user || '')}"></field>
+        <field><label>Usuario</label>
+          <select id="f_user">${userOptions}</select></field>
         <field><label>Desde</label><input id="f_from" type="date" value="${esc(meas.filters.from || '')}"></field>
         <field><label>Hasta</label><input id="f_to" type="date" value="${esc(meas.filters.to || '')}"></field>
         <field><label>Nombre de red</label><input id="f_q" value="${esc(meas.filters.q || '')}"></field>
+        <field><label>MAC / BSSID</label><input id="f_mac" value="${esc(meas.filters.mac || '')}"></field>
         <field><button type="submit">Aplicar</button>
           <button type="button" class="ghost" style="color:#00695c;border:1px solid #00695c" onclick="resetFilters()">Limpiar</button></field>
       </form>
@@ -176,7 +183,14 @@ async function renderMeasurements(d) {
         <button ${d.offset + d.limit >= d.total ? 'disabled' : ''} onclick="pageMeas(1)">Next →</button>
       </div>
       <table>
-        <tr><th>Usuario</th><th>SSID</th><th>BSSID</th><th>RSSI</th><th>Pos</th><th>Fecha</th></tr>
+        <tr>
+          ${th('username', 'Usuario')}
+          ${th('ssid', 'SSID')}
+          ${th('bssid', 'BSSID')}
+          ${th('rssi', 'RSSI')}
+          <th>Pos</th>
+          ${th('ts', 'Fecha')}
+        </tr>
         ${d.rows.map((m) => `<tr>
           <td>${esc(m.username)}</td><td>${esc(m.ssid)}</td><td>${esc(m.bssid)}</td>
           <td>${m.rssi}</td>
@@ -189,14 +203,31 @@ async function renderMeasurements(d) {
   $('filtersForm').onsubmit = (e) => {
     e.preventDefault();
     meas.filters = {
-      user: $('f_user').value.trim(),
+      user: $('f_user').value,
       from: $('f_from').value || '',
       to: $('f_to').value || '',
       q: $('f_q').value.trim(),
+      mac: $('f_mac').value.trim(),
     };
     meas.offset = 0;
     loadMeasurements();
   };
+}
+
+function th(col, label) {
+  const arrow = meas.sort === col ? (meas.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  return `<th style="cursor:pointer" onclick="sortMeas('${col}')">${label}${arrow}</th>`;
+}
+
+function sortMeas(col) {
+  if (meas.sort === col) {
+    meas.dir = meas.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    meas.sort = col;
+    meas.dir = 'desc';
+  }
+  meas.offset = 0;
+  loadMeasurements();
 }
 
 function pageMeas(delta) {

@@ -129,10 +129,22 @@ async function loadTerritories() {
     for (const t of data) {
       const color = colorForOwner(t.owner);
       const boundary = h3.cellToBoundary(t.hex, true); // [lng,lat]
-      L.polygon(boundary.map(p => [p[1], p[0]]), {
+      const opts = {
         color: color, weight: 1, fillColor: color, fillOpacity: 0.45,
-      }).addTo(territoryLayer)
-        .bindPopup(`<b>${esc(t.owner)}</b><br>cobertura: ${t.score}<br>${t.count} muestras`);
+      };
+      // Celdas en disputa: borde blanco punteado (presión del defensor).
+      if (t.contested) {
+        opts.color = '#ffffff';
+        opts.weight = 2;
+        opts.dashArray = '6 4';
+        opts.fillOpacity = 0.5;
+      }
+      const html = t.contested
+        ? `<b>${esc(t.owner)}</b><br>cobertura: ${t.score} · ⚔️ en disputa<br>` +
+          `<i>segundo: ${t.secondScore}</i>`
+        : `<b>${esc(t.owner)}</b><br>cobertura: ${t.score}<br>${t.count} muestras`;
+      L.polygon(boundary.map(p => [p[1], p[0]]), opts)
+        .addTo(territoryLayer).bindPopup(html);
     }
   } catch (e) {
     console.error('error territorios', e);

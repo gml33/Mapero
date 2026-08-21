@@ -98,7 +98,11 @@ Abrir `http://localhost:8080` en el navegador. La página:
 Registro/Login por usuario (hash **bcrypt**) que devuelve un **token de sesión**. Las peticiones de escritura llevan `Authorization: Bearer <token>`. La identidad del jugador es su **usuario**, y a él se atribuyen las mediciones, la conquista y el leaderboard.
 
 ## Juego de conquista
-La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su dueño. La posesión se calcula con **cobertura + decaimiento**: cada medición suma un peso que decae exponencialmente (~7 días); el dueño de un hexágono es el jugador con más cobertura acumulada. La identidad de cada jugador es su **nombre** (`x-device-name`).
+La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su dueño. La posesión se calcula con **cobertura + decaimiento**: cada medición suma un peso que decae exponencialmente (~7 días); el dueño de un hexágono es el jugador con más cobertura acumulada. La identidad es el **usuario** autenticado.
+
+**Anti-cheat:** la ingesta rechaza mediciones con velocidad imposible (>40 m/s ≈ 144 km/h) entre lecturas del mismo usuario (detecta teletransportes).
+
+**Defensa:** `GET /api/territories` devuelve también el **segundo** mejor score por celda y marca `contested` cuando supera el 60% del dueño — la web lo pinta con borde punteado como celda "en disputa".
 
 ## App Android
 La app sube cada barrido a `{serverUrl}/api/measurements`. Configurar la URL y la API key desde **Mapero → menú (⋮) → Servidor**. Para desarrollo en la misma red local, la URL del servidor es la IP LAN de la máquina (p. ej. `http://192.168.0.12:8080`).

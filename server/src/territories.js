@@ -31,25 +31,29 @@ export function buildTerritories(rows, now = Date.now()) {
     score.set(key, acc);
   }
 
-  // Por hexágono, elegir el dispositivo con mayor score.
+  // Por hexágono, reunir todos los jugadores y quedarnos con los 2 mejores.
   const byHex = new Map();
   for (const v of score.values()) {
-    const cur = byHex.get(v.hex);
-    if (!cur || v.score > cur.score
-        || (v.score === cur.score && v.lastTs > cur.lastTs)) {
-      byHex.set(v.hex, v);
-    }
+    if (!byHex.has(v.hex)) byHex.set(v.hex, []);
+    byHex.get(v.hex).push(v);
   }
 
-  return [...byHex.values()].map((v) => {
-    const [lat, lon] = cellToLatLng(v.hex);
+  return [...byHex.values()].map((list) => {
+    list.sort((a, b) => b.score - a.score || b.lastTs - a.lastTs);
+    const top = list[0];
+    const second = list[1];
+    const [lat, lon] = cellToLatLng(top.hex);
+    // "En disputa": el segundo tiene al menos 60% de la cobertura del dueño.
+    const contested = !!second && second.score >= 0.6 * top.score;
     return {
-      hex: v.hex,
+      hex: top.hex,
       latitude: lat,
       longitude: lon,
-      owner: v.name,
-      score: Math.round(v.score * 100) / 100,
-      count: v.count,
+      owner: top.name,
+      score: Math.round(top.score * 100) / 100,
+      secondScore: second ? Math.round(second.score * 100) / 100 : 0,
+      contested,
+      count: top.count,
     };
   });
 }

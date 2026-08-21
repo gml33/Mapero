@@ -39,15 +39,17 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 - Celdas **hexagonales H3 ~150 m** (resolución 10).
 - Regla **cobertura + decaimiento**: por celda, cada medición aporta un peso que decae con el tiempo (~7 días); el dueño es quien más cobertura acumulada tiene.
 - Competencia **individual**: cada jugador se identifica por nombre (`x-device-name`).
-- Endpoint `GET /api/territories` (dueño de cada hexágono + score).
+- Endpoint `GET /api/territories` (dueño de cada hexágono + score + disputa).
 - Endpoint `GET /api/leaderboard` (ranking de conquistas por jugador).
 - **Autenticación** por usuario (login/registro con token) — identidad establecida.
+- **Anti-cheat**: se rechazan mediciones con velocidad imposible (teletransporte) entre lecturas de un mismo usuario.
+- **Defensa de territorios**: las celdas se marcan **en disputa** cuando el segundo tiene ≥60% de la cobertura del dueño (borde punteado en la web).
 - **Web**: hexágonos coloreados por dueño (H3) + panel de ranking/leaderboard + login.
 - **App**: conexión/login (menú Servidor) y superposición de territorios en el mapa.
 
 ### Pendientes / ideas
-- Anti-cheat y validación de datos por usuario.
-- Decaimiento configurable y "guerra" por defensa de territorios.
+- Anti-cheat más fino (validación de datos, deduplicación, límites de tasa).
+- Decaimiento configurable y "guerra" por defensa (mecánica de reconquista).
 - Detalle de celdas vecinas y "frentes" entre jugadores.
 
 ---

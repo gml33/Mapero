@@ -41,6 +41,37 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// ---- Anti-cheat: velocidad máxima plausible (m/s). 40 m/s ≈ 144 km/h. ----
+const MAX_SPEED_MPS = 40;
+// Última posición conocida por usuario (para detectar teletransportes).
+const lastPos = new Map();
+
+function haversineM(aLat, aLon, bLat, bLon) {
+  const R = 6371000;
+  const dLat = (bLat - aLat) * Math.PI / 180;
+  const dLon = (bLon - aLon) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(aLat * Math.PI / 180) * Math.cos(bLat * Math.PI / 180)
+      * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function antiCheat(userId, lat, lon, tsMs) {
+  const prev = lastPos.get(userId);
+  let allowed = true;
+  if (prev) {
+    const dtS = (tsMs - prev.ts) / 1000;
+    if (dtS > 0) {
+      const speed = haversineM(prev.lat, prev.lon, lat, lon) / dtS;
+      if (speed > MAX_SPEED_MPS) allowed = false;
+    }
+  }
+  if (allowed && (!prev || tsMs >= prev.ts)) {
+    lastPos.set(userId, { lat, lon, ts: tsMs });
+  }
+  return allowed;
+}
+
 // ---- Ingesta de mediciones (requiere sesión) ----
 app.post('/api/measurements', requireAuth, async (req, res) => {
   const list = Array.isArray(req.body) ? req.body
@@ -60,19 +91,27 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
 
   try {
     const inserted = [];
+    let dropped = 0;
     for (const m of valid) {
+      const ts = new Date(m.timestamp || Date.now()).getTime();
+      if (!antiCheat(req.user.id, m.latitude, m.longitude, ts)) {
+        dropped++;
+        continue;
+      }
       const r = await pool.query(
         `INSERT INTO measurements
            (user_id, bssid, ssid, latitude, longitude, rssi, frequency, ts)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          RETURNING bssid, ssid, latitude, longitude, rssi, frequency, ts`,
         [req.user.id, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
-         m.frequency || null, new Date(m.timestamp || Date.now())]);
+         m.frequency || null, new Date(ts)]);
       inserted.push(r.rows[0]);
     }
 
-    broadcast({ type: 'measurements', data: inserted });
-    res.json({ ok: true, inserted: inserted.length });
+    if (inserted.length > 0) {
+      broadcast({ type: 'measurements', data: inserted });
+    }
+    res.json({ ok: true, inserted: inserted.length, dropped });
   } catch (e) {
     console.error('[api] error ingesta:', e);
     res.status(500).json({ error: 'Error interno' });

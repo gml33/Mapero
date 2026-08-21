@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgres://mapero:${POSTGRES_PASSWORD:-mapero_dev}@db:5432/mapero
       API_KEY: ${API_KEY:-mapero_dev_key}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      ADMIN_USER: ${ADMIN_USER:-}
     ports:
       - "${PORT:-8080}:8080"
 

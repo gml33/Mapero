@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapero · Panel admin</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <div id="login" class="login" style="display:none">
+    <h1 style="margin-bottom:14px">Mapero · Admin</h1>
+    <input id="loginUser" placeholder="Usuario" autocomplete="username">
+    <input id="loginPass" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button id="loginBtn" style="width:100%">Ingresar</button>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+
+  <div id="panel" style="display:none">
+    <header>
+      <h1>Mapero · Panel de administración</h1>
+      <span id="who"></span>
+      <div class="spacer"></div>
+      <a href="/" style="color:#fff;font-size:13px">← Mapa</a>
+      <button id="logoutBtn" class="ghost">Salir</button>
+    </header>
+    <nav>
+      <button data-view="stats" class="active">Estadísticas</button>
+      <button data-view="users">Usuarios</button>
+      <button data-view="measurements">Mediciones</button>
+      <button data-view="config">Configuración</button>
+    </nav>
+    <main>
+      <section id="view-stats" class="view"></section>
+      <section id="view-users" class="view" style="display:none"></section>
+      <section id="view-measurements" class="view" style="display:none"></section>
+      <section id="view-config" class="view" style="display:none"></section>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

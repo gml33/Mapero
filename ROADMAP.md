@@ -79,16 +79,19 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 
 ---
 
-## 7. Panel de administración (web)
-- Sección en la web, restringida a **roles de administrador**, para gestionar:
-  - Usuarios (ver, desactivar, cambiar rol).
-  - Datos/mediciones (borrar, auditar, stats globales).
-  - Terrenos/leaderboard (forzar recálculo, moderar).
-  - Configuración del juego (tamaño de celdas, decaimiento, umbral de disputa).
+## 7. ✅ Panel de administración (web) — v1 implementada
+- Ruta **`/admin`** en la web, protegida por **rol de administrador**.
+- **Roles**: los usuarios tienen `role` (`user`/`admin`); el primer admin se define con `ADMIN_USER` (variable de entorno).
+- Secciones:
+  - **Estadísticas** del sistema (usuarios, mediciones, territorios).
+  - **Usuarios** (ver, cambiar rol, borrar).
+  - **Mediciones** (listar, borrar todo).
+  - **Configuración** del sistema (intervalo de escaneo, calibración, resolución de hexágonos, decaimiento, umbral de disputa).
+- **Config remota**: `GET /api/config` (público) — la app Android lo descarga y aplica (intervalo + calibración).
 
-### Consideraciones
-- Añadir roles a los usuarios (`user` / `admin`) y un middleware de autorización.
-- Rutas de administración separadas y protegidas.
+### Pendientes / ideas
+- Desactivar usuarios (en vez de solo borrar), auditoría, forzar recálculo de territorios.
+- Más opciones de configuración y control de roles más fino.
 
 ## 8. Login con Google (Gmail)
 - Autenticación vía **OAuth 2.0 con Google** además del usuario/contraseña actual.

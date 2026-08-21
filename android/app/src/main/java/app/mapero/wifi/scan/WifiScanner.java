@@ -54,6 +54,7 @@ public class WifiScanner {
     private LocationHelper locationHelper;
     private final List<Listener> listeners = new ArrayList<>();
     private volatile boolean running = false;
+    private volatile long baseScanIntervalMs = 6000;
     private int lastApCount = 0;
 
     // Filtro de suavizado RSSI (media móvil exponencial por BSSID)
@@ -131,17 +132,24 @@ public class WifiScanner {
      * Intervalo entre escaneos según la velocidad de movimiento: a mayor
      * velocidad, más escaneos por minuto (y viceversa al estar parado).
      */
+    /** Ajusta el intervalo base (lo define el servidor vía /api/config). */
+    public void setScanIntervalBase(long baseMs) {
+        if (baseMs > 0) {
+            baseScanIntervalMs = baseMs;
+        }
+    }
+
     private long computeIntervalMs() {
         float speed = locationHelper.getSpeed();
         long interval;
         if (speed < 0.8f) {
-            interval = 12000;   // parado / muy lento
+            interval = (long) (baseScanIntervalMs * 2.0);   // parado / muy lento
         } else if (speed < 1.5f) {
-            interval = 8000;    // paso lento
+            interval = (long) (baseScanIntervalMs * 1.33);  // paso lento
         } else if (speed < 2.5f) {
-            interval = 6000;    // caminata normal
+            interval = baseScanIntervalMs;                   // caminata normal
         } else {
-            interval = 3500;    // rápido / corriendo
+            interval = (long) (baseScanIntervalMs * 0.58);  // rápido / corriendo
         }
         return Math.max(MIN_SCAN_INTERVAL_MS, Math.min(MAX_SCAN_INTERVAL_MS, interval));
     }

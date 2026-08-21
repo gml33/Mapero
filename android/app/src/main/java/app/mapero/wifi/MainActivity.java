@@ -155,6 +155,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         updateStreamButton();
 
         uiHandler.post(territoryLoop);
+        applyServerConfig();
 
         // Observa las mediciones, las agrega por trilateración y pinta los puntos
         Observer<List<WifiMeasurement>> observer = data -> {
@@ -355,6 +356,40 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
                     ? ContextCompat.getDrawable(this, R.drawable.dot_green)
                     : null);
         }
+    }
+
+    // ---- Configuración remota (desde el panel admin) ----
+
+    private void applyServerConfig() {
+        ioExecutor.execute(() -> {
+            try {
+                ServerConfig sc = ServerConfig.load(this);
+                if (sc.serverUrl == null || sc.serverUrl.isEmpty()) return;
+                URL url = new URL(sc.serverUrl + "/api/config");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                try {
+                    if (conn.getResponseCode() != 200) return;
+                    JSONObject cfg = new JSONObject(readAll(conn.getInputStream()));
+
+                    long interval = cfg.optLong("scanIntervalMs", 0);
+                    if (interval > 0) scanner.setScanIntervalBase(interval);
+
+                    JSONObject cal = cfg.optJSONObject("calibration");
+                    if (cal != null) {
+                        calibration.txPower = cal.optDouble("txPower", calibration.txPower);
+                        calibration.pathLossN = cal.optDouble("pathLossN", calibration.pathLossN);
+                        calibration.save(this);
+                        runOnUiThread(this::refreshMap);
+                    }
+                } finally {
+                    conn.disconnect();
+                }
+            } catch (Exception e) {
+                android.util.Log.w("ConfigRemota", "error: " + e.getMessage());
+            }
+        });
     }
 
     // ---- Territorios (juego de conquista) ----

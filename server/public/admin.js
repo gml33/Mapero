@@ -1,0 +1,154 @@
+let token = localStorage.getItem('mapero_token') || '';
+
+const $ = (id) => document.getElementById(id);
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(path, { ...opts, headers });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+  return res.status === 200 ? res.json() : null;
+}
+
+// ---- Login ----
+async function checkSession() {
+  if (!token) { showLogin(); return; }
+  try {
+    await api('/api/admin/stats');
+    showPanel();
+  } catch (e) {
+    showLogin();
+  }
+}
+
+function showLogin() { $('login').style.display = 'block'; $('panel').style.display = 'none'; }
+function showPanel() { $('login').style.display = 'none'; $('panel').style.display = 'block'; renderAll(); }
+
+$('loginBtn').onclick = async () => {
+  const username = $('loginUser').value.trim();
+  const password = $('loginPass').value;
+  try {
+    const r = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    token = r.token;
+    localStorage.setItem('mapero_token', token);
+    localStorage.setItem('mapero_user', username);
+    showPanel();
+  } catch (e) {
+    $('loginMsg').textContent = 'Credenciales inválidas';
+  }
+};
+
+$('logoutBtn').onclick = () => {
+  token = '';
+  localStorage.removeItem('mapero_token');
+  showLogin();
+};
+
+// ---- Tabs ----
+document.querySelectorAll('nav button').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('nav button').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    document.querySelectorAll('.view').forEach((v) => (v.style.display = 'none'));
+    $('view-' + b.dataset.view).style.display = 'block';
+    renderAll(b.dataset.view);
+  };
+});
+
+function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+// ---- Render ----
+function renderAll(view) {
+  if (!view) view = document.querySelector('nav button.active').dataset.view;
+  $('who').textContent = localStorage.getItem('mapero_user') || '';
+  if (view === 'stats') renderStats();
+  if (view === 'users') renderUsers();
+  if (view === 'measurements') renderMeasurements();
+  if (view === 'config') renderConfig();
+}
+
+async function renderStats() {
+  const s = await api('/api/admin/stats');
+  $('view-stats').innerHTML = `
+    <div class="card stats">
+      <div><div class="n">${s.users}</div><div class="lbl">Usuarios</div></div>
+      <div><div class="n">${s.measurements}</div><div class="lbl">Mediciones</div></div>
+      <div><div class="n">${s.territories}</div><div class="lbl">Territorios</div></div>
+    </div>`;
+}
+
+async function renderUsers() {
+  const users = await api('/api/admin/users');
+  $('view-users').innerHTML = `<div class="card"><h2>Usuarios</h2>
+    <table>
+      <tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Registrado</th><th></th></tr>
+      ${users.map((u) => `<tr>
+        <td>${u.id}</td><td>${esc(u.username)}</td>
+        <td>
+          <select onchange="setRole(${u.id}, this.value)">
+            <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+          </select>
+        </td>
+        <td>${new Date(u.created_at).toLocaleDateString()}</td>
+        <td><button class="small danger" onclick="delUser(${u.id})">Borrar</button></td>
+      </tr>`).join('')}
+    </table></div>`;
+}
+
+async function setRole(id, role) {
+  await api('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ role }) });
+  renderUsers();
+}
+async function delUser(id) {
+  if (!confirm('¿Borrar este usuario y sus datos?')) return;
+  await api('/api/admin/users/' + id, { method: 'DELETE' });
+  renderUsers();
+}
+
+async function renderMeasurements() {
+  const d = await api('/api/admin/measurements?limit=200');
+  $('view-measurements').innerHTML = `<div class="card">
+    <h2>Mediciones (${d.total})</h2>
+    <button class="danger" onclick="clearMeasurements()">Borrar todas</button>
+    <table>
+      <tr><th>Usuario</th><th>SSID</th><th>BSSID</th><th>RSSI</th><th>Pos</th><th>Fecha</th></tr>
+      ${d.rows.map((m) => `<tr>
+        <td>${esc(m.username)}</td><td>${esc(m.ssid)}</td><td>${esc(m.bssid)}</td>
+        <td>${m.rssi}</td>
+        <td>${m.latitude.toFixed(4)}, ${m.longitude.toFixed(4)}</td>
+        <td>${new Date(m.ts).toLocaleString()}</td>
+      </tr>`).join('')}
+    </table></div>`;
+}
+async function clearMeasurements() {
+  if (!confirm('¿Borrar TODAS las mediciones?')) return;
+  await api('/api/admin/measurements', { method: 'DELETE' });
+  renderMeasurements();
+}
+
+async function renderConfig() {
+  const s = await api('/api/admin/settings');
+  $('view-config').innerHTML = `<div class="card"><h2>Configuración</h2>
+    <form id="cfgForm">
+      <field><label>Intervalo de escaneo (ms)</label><input id="scan_interval_ms" type="number"></field>
+      <field><label>Calibración · señal a 1 m (dBm)</label><input id="calibration_tx" type="number" step="1"></field>
+      <field><label>Calibración · exponente n</label><input id="calibration_n" type="number" step="0.1"></field>
+      <field><label>Resolución hexágonos (H3)</label><input id="hex_res" type="number"></field>
+      <field><label>Decaimiento (días)</label><input id="decay_days" type="number" step="0.5"></field>
+      <field><label>Umbral de disputa</label><input id="contest_threshold" type="number" step="0.05"></field>
+      <field class="full"><button type="submit">Guardar</button></field>
+    </form>
+    <p class="tip">La app Android descarga estos valores al abrirse y los aplica.</p>
+  </div>`;
+  for (const k of Object.keys(s)) $(k).value = s[k];
+  $('cfgForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const patch = {};
+    for (const k of Object.keys(s)) patch[k] = $(k).value;
+    await api('/api/config', { method: 'PUT', body: JSON.stringify(patch) });
+    alert('Configuración guardada');
+  };
+}
+
+checkSession();

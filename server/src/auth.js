@@ -65,7 +65,7 @@ export async function requireAuth(req, res, next) {
       return res.status(401).json({ error: 'Falta token' });
     }
     const r = await pool.query(
-      `SELECT u.id, u.username FROM sessions s
+      `SELECT u.id, u.username, u.role FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token = $1`, [token]);
     if (!r.rows[0]) {
@@ -76,4 +76,15 @@ export async function requireAuth(req, res, next) {
   } catch (e) {
     res.status(500).json({ error: 'Error interno' });
   }
+}
+
+/** Middleware: requiere sesión válida y rol de administrador. */
+export async function requireAdmin(req, res, next) {
+  await requireAuth(req, res, () => {
+    if (req.user && req.user.role === 'admin') {
+      next();
+    } else {
+      res.status(403).json({ error: 'No autorizado' });
+    }
+  });
 }

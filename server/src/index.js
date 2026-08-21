@@ -7,7 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool, initDb } from './db.js';
 import { buildTerritories } from './territories.js';
-import { register, login, requireAuth } from './auth.js';
+import { register, login, requireAuth, requireAdmin } from './auth.js';
+import { getSettings, updateSettings, appConfig } from './config.js';
 
 dotenv.config();
 
@@ -21,6 +22,8 @@ app.use(express.json({ limit: '1mb' }));
 
 // ---- Servir la página web ----
 app.use(express.static(path.join(__dirname, '../public')));
+app.get('/admin', (_req, res) =>
+  res.sendFile(path.join(__dirname, '../public/admin.html')));
 
 // ---- Autenticación ----
 app.post('/api/auth/register', async (req, res) => {
@@ -195,6 +198,127 @@ app.get('/api/last-position', async (_req, res) => {
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// ---- Configuración ----
+// GET público: la app Android lo descarga para aplicar intervalo/calibración.
+app.get('/api/config', async (_req, res) => {
+  try {
+    res.json(await appConfig());
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PUT admin: edita la configuración del sistema.
+app.put('/api/config', requireAdmin, async (req, res) => {
+  try {
+    const allowed = ['hex_res', 'decay_days', 'contest_threshold',
+      'scan_interval_ms', 'calibration_tx', 'calibration_n'];
+    const patch = {};
+    for (const k of allowed) {
+      if (req.body && req.body[k] !== undefined) patch[k] = req.body[k];
+    }
+    if (Object.keys(patch).length) {
+      await updateSettings(patch);
+    }
+    res.json(await appConfig());
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// ---- Panel de administración ----
+
+// Estadísticas del sistema
+app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
+  try {
+    const users = await pool.query('SELECT COUNT(*)::int n FROM users');
+    const meas = await pool.query('SELECT COUNT(*)::int n FROM measurements');
+    const terr = await pool.query(
+      `SELECT m.user_id, u.username AS name, m.latitude, m.longitude, m.ts
+       FROM measurements m JOIN users u ON u.id = m.user_id
+       WHERE m.ts > now() - interval '30 days'`);
+    const territories = buildTerritories(terr.rows);
+    res.json({
+      users: users.rows[0].n,
+      measurements: meas.rows[0].n,
+      territories: territories.length,
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// Lista de usuarios
+app.get('/api/admin/users', requireAdmin, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, username, role, created_at FROM users ORDER BY id`);
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// Editar rol de un usuario
+app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
+  try {
+    const role = req.body?.role;
+    if (!['admin', 'user'].includes(role)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+    await pool.query('UPDATE users SET role = $1 WHERE id = $2',
+      [role, req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// Borrar un usuario (y sus datos en cascada)
+app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// Mediciones: listar (paginado) y borrar
+app.get('/api/admin/measurements', requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const offset = Number(req.query.offset) || 0;
+    const { rows } = await pool.query(
+      `SELECT m.id, u.username, m.bssid, m.ssid, m.latitude, m.longitude,
+              m.rssi, m.ts
+       FROM measurements m JOIN users u ON u.id = m.user_id
+       ORDER BY m.ts DESC LIMIT $1 OFFSET $2`, [limit, offset]);
+    const cnt = await pool.query('SELECT COUNT(*)::int n FROM measurements');
+    res.json({ total: cnt.rows[0].n, rows });
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+app.delete('/api/admin/measurements', requireAdmin, async (_req, res) => {
+  try {
+    await pool.query('DELETE FROM measurements');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// Configuración del juego (leer/editar)
+app.get('/api/admin/settings', requireAdmin, async (_req, res) => {
+  try {
+    res.json(await getSettings());
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
 
 // ---- WebSocket en tiempo real ----
 const server = createServer(app);

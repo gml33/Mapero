@@ -150,7 +150,9 @@ La app puede subir sus mediciones a un servidor que las muestra en un **mapa web
 - **API**: `POST /api/measurements` (ingesta), `GET /api/networks` (agregadas), `WS /ws` (broadcast).
 - **Web**: mapa Leaflet (OpenStreetMap) con actualización en tiempo real y fecha de última actualización.
 - **Docker**: el stack completo (backend + PostgreSQL) corre con `docker compose up -d --build` para desplegarlo en un VPS. Variables en `.env.example`.
-- En la app: **menú (⋮) → Servidor** para configurar la URL y la API key.
+- **Panel de administración** en `/admin`: gestión de usuarios, mediciones, estadísticas y configuración del sistema (roles `admin`/`user`).
+- **Config remota**: la app descarga `/api/config` (intervalo de escaneo y calibración) y la aplica.
+- En la app: **menú (⋮) → Servidor** para conectarse (usuario + contraseña).
 
 ## 🗺️ Roadmap
 

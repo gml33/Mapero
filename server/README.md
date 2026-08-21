@@ -55,6 +55,11 @@ docker compose up -d --build
 
 Para detener: `docker compose down` (con `-v` borra también el volumen de datos).
 
+## Panel de administración
+- Web en **`/admin`**: estadísticas, usuarios (rol/borrado), mediciones y configuración del sistema.
+- Acceso restringido al **rol admin**. Definí el primer administrador con la variable `ADMIN_USER` (debe ser un usuario ya registrado); su rol se marca `admin` al arrancar.
+- La app Android descarga `GET /api/config` y aplica el intervalo de escaneo y la calibración editados desde el panel.
+
 ## Despliegue en un VPS
 
 1. Llevá el proyecto (o el `docker-compose.yml` + `server/`) al VPS.
@@ -74,6 +79,12 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 | `GET` | `/api/networks` | — | Redes agregadas (carga inicial de la web). |
 | `GET` | `/api/territories` | — | Hexágonos (H3) conquistados y su dueño. |
 | `GET` | `/api/leaderboard` | — | Ranking de conquistas por jugador. |
+| `GET` | `/api/config` | — | Configuración que descargan las apps (intervalo, calibración, territorio). |
+| `PUT` | `/api/config` | admin | Edita la configuración del sistema. |
+| `GET` | `/api/admin/stats` | admin | Estadísticas del sistema. |
+| `GET/PUT/DELETE` | `/api/admin/users[/:id]` | admin | Gestión de usuarios (rol, borrado). |
+| `GET/DELETE` | `/api/admin/measurements` | admin | Listar / borrar mediciones. |
+| `GET` | `/api/admin/settings` | admin | Configuración actual. |
 | `GET` | `/api/last-position` | — | Última posición medida (centrado inicial). |
 | `GET` | `/health` | — | Estado. |
 | `WS` | `/ws` | — | Emite `{type:"measurements", data:[...]}` en tiempo real. |

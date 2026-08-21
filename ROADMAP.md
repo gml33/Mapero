@@ -79,6 +79,50 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 
 ---
 
+## 7. Panel de administración (web)
+- Sección en la web, restringida a **roles de administrador**, para gestionar:
+  - Usuarios (ver, desactivar, cambiar rol).
+  - Datos/mediciones (borrar, auditar, stats globales).
+  - Terrenos/leaderboard (forzar recálculo, moderar).
+  - Configuración del juego (tamaño de celdas, decaimiento, umbral de disputa).
+
+### Consideraciones
+- Añadir roles a los usuarios (`user` / `admin`) y un middleware de autorización.
+- Rutas de administración separadas y protegidas.
+
+## 8. Login con Google (Gmail)
+- Autenticación vía **OAuth 2.0 con Google** además del usuario/contraseña actual.
+- El usuario inicia sesión con su cuenta de Gmail y el servidor asocia la identidad.
+
+### Consideraciones
+- Requiere registrar la app en Google Cloud (client id/secret) y flujo OAuth (web) / Google Sign-In (Android).
+- Mapear el sub (identificador de Google) a un usuario interno.
+- Compatible con el login por usuario/contraseña actual (misma identidad para conquista).
+
+## 9. Características "Pro"
+- Suscripción o plan **Pro** con funciones premium. Ideas:
+  - Historial ilimitado / exportaciones avanzadas (GeoJSON, estadísticas).
+  - Múltiples territorios / equipos, herramientas de análisis.
+  - Mayor frecuencia de escaneo y sincronización.
+  - Sin anuncios y funciones de personalización.
+
+### Consideraciones
+- Requiere gestión de suscripciones (Google Play Billing) y estado "pro" por usuario en el servidor.
+- Definir qué queda gratis vs. Pro.
+
+## 10. Versión de navegación (conquista territorial náutica — sin WiFi)
+- Una variante del mapeo pensada para **navegación marítima/fluvial**:
+  - En lugar de WiFi, se conquistan **territorios náuticos** (zonas de agua) por cobertura de navegación.
+  - Las celdas (hexágonos) se asignan según el recorrido en agua, no por señales WiFi.
+- Puede compartir la misma infraestructura (territorios H3, leaderboard, conquista) pero con un "modo de dato" distinto (posiciones de la embarcación, sin RSSI).
+
+### Consideraciones
+- Fuente de datos: solo GPS/rumbo (sin escaneo WiFi) en el modo navegación.
+- Las celdas náuticas podrían exigir estar sobre agua (filtro por tierra/agua).
+- Reutiliza hexágonos H3, decaimiento y defensa; cambia la ingesta.
+
+---
+
 ## Dependencias entre módulos
 ```
 Mapa web (1)
@@ -89,6 +133,12 @@ Fecha de actualización (3)
    └── parte local + backend (1/2)
 Filtros (5) y búsqueda (6)
    └── puramente locales (opcionalmente con backend en el futuro)
+Panel admin (7) y Pro (9)
+   └── requieren roles y gestión de usuarios sobre la API (2)
+Login Google (8)
+   └── se suma al esquema de auth (2)
+Navegación (10)
+   └── variante de la conquista (4) con otra fuente de datos
 ```
 
-> Sugerencia de orden: primero la **API (2)**, porque habilita el mapa web (1) y la conquista (4). La fecha de actualización (3) puede hacerse de forma independiente y antes, por ser puramente local. Los **filtros (5)** y la **búsqueda (6)** también son independientes y solo requieren cambios en la app.
+> Sugerencia de orden: primero la **API (2)**, porque habilita el mapa web (1) y la conquista (4). La fecha de actualización (3) puede hacerse de forma independiente y antes, por ser puramente local. Los **filtros (5)** y la **búsqueda (6)** también son independientes y solo requieren cambios en la app. El **panel admin (7)** y el **login Google (8)** se apoyan en la autenticación existente; las **features Pro (9)** y la **navegación (10)** son proyectos aparte.

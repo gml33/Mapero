@@ -5,4 +5,6 @@
     <color name="signal_strong">#2E7D32</color>
     <color name="signal_good">#F9A825</color>
     <color name="signal_weak">#C62828</color>
+    <color name="stream_on">#2E7D32</color>
+    <color name="stream_off">#455A64</color>
 </resources>

@@ -293,6 +293,17 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     private void updateStreamButton() {
         boolean streaming = ServerConfig.load(this).streaming;
         streamButton.setText(streaming ? R.string.stream_on : R.string.stream_off);
+        int tint = ContextCompat.getColor(this,
+                streaming ? R.color.stream_on : R.color.stream_off);
+        streamButton.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(tint));
+
+        // Círculo verde junto al título "Mapero" cuando el streaming está activo.
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setLogo(streaming
+                    ? ContextCompat.getDrawable(this, R.drawable.dot_green)
+                    : null);
+        }
     }
 
     // ---- WifiScanner.Listener ----

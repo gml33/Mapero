@@ -1,23 +1,24 @@
 # Roadmap · Mapero
 
-Funcionalidades previstas para el futuro, ordenadas por temática. Nada de esto está implementado aún; es una guía de trabajo.
+Funcionalidades previstas para el futuro, ordenadas por temática. Las que están ✅ **implementadas** tienen una versión inicial funcionando (ver `server/`).
 
-## 1. Mapa web en tiempo real
-- Subir en tiempo real los datos (redes + posición + señal) desde la app a un servidor.
-- Un sitio web donde se visualicen en vivo las redes y sus datos sobre un mapa (tiles + marcadores, similar a la app).
-- Actualización push/streaming (WebSocket o similar) para no depender de recargas manuales.
+## 1. ✅ Mapa web en tiempo real (v1 implementada)
+- La app sube en tiempo real los datos (redes + posición + señal) a un servidor (`POST /api/measurements`).
+- Un sitio web las visualiza en vivo sobre un mapa (Leaflet + OpenStreetMap), con colores por intensidad.
+- Actualización en tiempo real por WebSocket.
+- Muestra la **fecha de la última actualización** y el conteo de redes.
+- Pendientes: autenticación, streaming más fino, filtros en la web.
 
 ### Consideraciones
 - Modelo de datos a sincronizar: mismos campos que `measurements` + identificador de dispositivo/usuario.
 - Manejar privacidad y autenticación antes de exponer datos públicos.
 - Política de uso razonable del backend (límites de requests).
 
-## 2. API para subir y compartir datos en tiempo real entre dispositivos
-- Endpoint(s) REST (o gRPC/WebSocket) para:
-  - **Ingesta**: `POST /measurements` desde cada dispositivo.
-  - **Consulta**: `GET /networks` / `GET /networks/{id}` para leer datos de otros usuarios.
-  - **Sincronización incremental**: enviar solo mediciones nuevas (timestamp/offset).
-- Permite que varios dispositivos **colaboren** mapeando la misma zona en tiempo real.
+## 2. ✅ API para subir y compartir datos en tiempo real entre dispositivos (v1 implementada)
+- **Ingesta**: `POST /api/measurements` (con `x-api-key`), ya usada por la app Android.
+- **Consulta**: `GET /api/networks` (redes agregadas) para la carga inicial de la web.
+- **Tiempo real**: WebSocket `/ws` que transmite cada ingesta a todos los clientes conectados.
+- Pendientes: sincronización incremental (timestamp/offset), auth por dispositivo, `GET /networks/{id}`, paginación y filtros.
 
 ### Consideraciones
 - Autenticación por token/API key por usuario o dispositivo.

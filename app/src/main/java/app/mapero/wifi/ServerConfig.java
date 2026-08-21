@@ -1,0 +1,43 @@
+package app.mapero.wifi;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+/**
+ * Configuración del servidor remoto para la sincronización en tiempo real.
+ * - serverUrl: URL base de la API (p. ej. http://192.168.0.12:8080).
+ * - apiKey: clave de escritura usada por el servidor.
+ */
+public final class ServerConfig {
+
+    public static final String DEFAULT_URL = "http://192.168.0.12:8080";
+    public static final String DEFAULT_API_KEY = "mapero_dev_key";
+
+    private static final String PREFS = "server";
+    private static final String KEY_URL = "serverUrl";
+    private static final String KEY_KEY = "apiKey";
+
+    public String serverUrl;
+    public String apiKey;
+
+    public ServerConfig() {
+        serverUrl = DEFAULT_URL;
+        apiKey = DEFAULT_API_KEY;
+    }
+
+    public static ServerConfig load(Context context) {
+        ServerConfig c = new ServerConfig();
+        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        c.serverUrl = sp.getString(KEY_URL, DEFAULT_URL);
+        c.apiKey = sp.getString(KEY_KEY, DEFAULT_API_KEY);
+        return c;
+    }
+
+    public void save(Context context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_URL, serverUrl)
+                .putString(KEY_KEY, apiKey)
+                .apply();
+    }
+}

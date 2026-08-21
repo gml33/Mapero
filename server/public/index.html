@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapero · Mapa en tiempo real</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Mapero</h1>
+    <span id="status" class="status desconectado">Conectando…</span>
+    <span id="count" class="count">0 redes</span>
+    <span id="lastUpdate" class="last">última actualización: —</span>
+  </header>
+  <div id="map"></div>
+  <div id="legend">
+    <span><i class="dot dot-strong"></i> Fuerte (≥ -60)</span>
+    <span><i class="dot dot-good"></i> Media (-60..-75)</span>
+    <span><i class="dot dot-weak"></i> Débil (≤ -75)</span>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

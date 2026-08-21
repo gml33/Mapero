@@ -17,6 +17,7 @@ import android.util.Log;
 
 import androidx.core.content.ContextCompat;
 
+import app.mapero.wifi.Uploader;
 import app.mapero.wifi.data.AppDatabase;
 import app.mapero.wifi.data.WifiMeasurement;
 
@@ -45,6 +46,7 @@ public class WifiScanner {
     private final Context context;
     private final WifiManager wifiManager;
     private final AppDatabase database;
+    private final Uploader uploader;
     private final ExecutorService dbExecutor = Executors.newSingleThreadExecutor();
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -82,6 +84,7 @@ public class WifiScanner {
         this.wifiManager = (WifiManager) context.getApplicationContext()
                 .getSystemService(Context.WIFI_SERVICE);
         this.database = AppDatabase.getInstance(context);
+        this.uploader = new Uploader(this.context);
         this.locationHelper = new LocationHelper(this.context);
     }
 
@@ -193,6 +196,8 @@ public class WifiScanner {
                     Log.e(TAG, "Error guardando", e);
                 }
             });
+            // Sube el mismo lote al servidor en tiempo real.
+            uploader.enqueue(batch);
         }
     }
 

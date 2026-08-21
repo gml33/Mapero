@@ -1,0 +1,101 @@
+const MAP_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const MAP_ATTR = '&copy; OpenStreetMap contributors';
+
+const map = L.map('map').setView([-34.6118, -58.4173], 14);
+L.tileLayer(MAP_TILE, { attribution: MAP_ATTR, maxZoom: 19 }).addTo(map);
+
+// Estado de las redes: name -> agregación (centroide ponderado por señal).
+const networks = new Map();
+
+function setStatus(text, online) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status ' + (online ? 'online' : 'offline');
+}
+
+function colorFor(rssi) {
+  if (rssi >= -60) return '#2e7d32';
+  if (rssi >= -75) return '#f9a825';
+  return '#c62828';
+}
+
+function ingest(bssid, ssid, lat, lon, rssi) {
+  const name = (ssid && ssid.trim()) ? ssid : bssid;
+  let n = networks.get(name);
+  if (!n) {
+    n = { sumLat: 0, sumLon: 0, sumW: 0, sumRssi: 0, count: 0, marker: null };
+    networks.set(name, n);
+  }
+  const w = Math.max(0, rssi + 90);
+  n.sumLat += lat * w;
+  n.sumLon += lon * w;
+  n.sumW += w;
+  n.sumRssi += rssi;
+  n.count++;
+}
+
+function addNetwork(name) {
+  const n = networks.get(name);
+  if (!n) return;
+  const lat = n.sumLat / n.sumW;
+  const lon = n.sumLon / n.sumW;
+  const rssi = n.sumRssi / n.count;
+
+  if (n.marker) {
+    n.marker.setLatLng([lat, lon]).setStyle({ color: colorFor(rssi) });
+    n.marker.bindPopup(`<b>${esc(name)}</b><br>Señal: ${rssi.toFixed(0)} dBm · ${n.count} muestras`);
+  } else {
+    n.marker = L.circleMarker([lat, lon], {
+      radius: 8, color: colorFor(rssi), weight: 2, fillOpacity: 0.8,
+    }).addTo(map).bindPopup(`<b>${esc(name)}</b><br>Señal: ${rssi.toFixed(0)} dBm · ${n.count} muestras`);
+  }
+}
+
+function refreshAll() {
+  for (const name of networks.keys()) addNetwork(name);
+  document.getElementById('count').textContent = networks.size + ' redes';
+  document.getElementById('lastUpdate').textContent =
+    'última actualización: ' + new Date().toLocaleTimeString();
+}
+
+// Carga inicial
+async function loadInitial() {
+  try {
+    const res = await fetch('/api/networks');
+    const rows = await res.json();
+    for (const r of rows) {
+      const rssi = Number(r.rssi);
+      ingest(r.name, r.name, Number(r.latitude), Number(r.longitude), rssi);
+    }
+    refreshAll();
+  } catch (e) {
+    console.error('error carga inicial', e);
+  }
+}
+
+// WebSocket en tiempo real
+let ws;
+function connect() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.onopen = () => setStatus('En línea', true);
+  ws.onclose = () => {
+    setStatus('Sin conexión', false);
+    setTimeout(connect, 3000);
+  };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'measurements') {
+      for (const m of msg.data) {
+        ingest(m.bssid, m.ssid, Number(m.latitude), Number(m.longitude), Number(m.rssi));
+      }
+      refreshAll();
+    }
+  };
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+loadInitial();
+connect();

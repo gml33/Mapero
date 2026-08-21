@@ -15,5 +15,9 @@ local.properties
 # Salidas
 app/build/
 
+# Servidor
+server/node_modules/
+server/.env
+
 # OS
 .DS_Store

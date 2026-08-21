@@ -1,0 +1,121 @@
+import express from 'express';
+import cors from 'cors';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { pool, initDb } from './db.js';
+
+dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORT = Number(process.env.PORT || 8080);
+const API_KEY = process.env.API_KEY || 'mapero_dev_key';
+
+const app = express();
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+app.use(express.json({ limit: '1mb' }));
+
+// ---- Servir la página web ----
+app.use(express.static(path.join(__dirname, '../public')));
+
+// ---- Auth de escritura ----
+function checkKey(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (key !== API_KEY) {
+    return res.status(401).json({ error: 'API key inválida' });
+  }
+  next();
+}
+
+// ---- Ingesta de mediciones ----
+app.post('/api/measurements', checkKey, async (req, res) => {
+  const list = Array.isArray(req.body) ? req.body
+    : Array.isArray(req.body?.measurements) ? req.body.measurements : null;
+
+  if (!list || list.length === 0) {
+    return res.status(400).json({ error: 'Enviar un array de mediciones' });
+  }
+
+  const valid = list.filter(m =>
+    m && m.bssid && Number.isFinite(m.latitude) && Number.isFinite(m.longitude)
+        && Number.isFinite(m.rssi));
+
+  if (valid.length === 0) {
+    return res.status(400).json({ error: 'Mediciones inválidas' });
+  }
+
+  try {
+    // Auto-registro del dispositivo según su API key.
+    const dev = await pool.query(
+      'INSERT INTO devices (api_key, name) VALUES ($1, $2) ' +
+      'ON CONFLICT (api_key) DO UPDATE SET name = EXCLUDED.name ' +
+      'RETURNING id', [API_KEY, req.headers['x-device-name'] || 'android']);
+    const deviceId = dev.rows[0].id;
+
+    const inserted = [];
+    for (const m of valid) {
+      const r = await pool.query(
+        `INSERT INTO measurements
+           (device_id, bssid, ssid, latitude, longitude, rssi, frequency, ts)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         RETURNING bssid, ssid, latitude, longitude, rssi, frequency, ts`,
+        [deviceId, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
+         m.frequency || null, new Date(m.timestamp || Date.now())]);
+      inserted.push(r.rows[0]);
+    }
+
+    broadcast({ type: 'measurements', data: inserted });
+    res.json({ ok: true, inserted: inserted.length });
+  } catch (e) {
+    console.error('[api] error ingesta:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// ---- Redes agregadas (carga inicial para la web) ----
+app.get('/api/networks', async (_req, res) => {
+  try {
+    const key = `COALESCE(NULLIF(ssid, ''), bssid)`;
+    const { rows } = await pool.query(
+      `SELECT ${key} AS name,
+              AVG(latitude)  AS latitude,
+              AVG(longitude) AS longitude,
+              AVG(rssi)      AS rssi,
+              COUNT(*)       AS samples,
+              MAX(ts)        AS last_seen
+       FROM measurements
+       GROUP BY ${key}
+       ORDER BY last_seen DESC`);
+    res.json(rows);
+  } catch (e) {
+    console.error('[api] error networks:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// ---- WebSocket en tiempo real ----
+const server = createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+wss.on('connection', (ws) => {
+  ws.send(JSON.stringify({ type: 'hello', message: 'conectado' }));
+});
+
+function broadcast(message) {
+  const payload = JSON.stringify(message);
+  for (const client of wss.clients) {
+    if (client.readyState === client.OPEN) {
+      client.send(payload);
+    }
+  }
+}
+
+await initDb();
+server.listen(PORT, () => {
+  console.log(`[server] http://localhost:${PORT}`);
+  console.log(`[server] ws://localhost:${PORT}/ws`);
+});

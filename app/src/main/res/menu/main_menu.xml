@@ -13,4 +13,7 @@
     <item
         android:id="@+id/action_calibrate"
         android:title="Calibrar" />
+    <item
+        android:id="@+id/action_server"
+        android:title="Servidor" />
 </menu>

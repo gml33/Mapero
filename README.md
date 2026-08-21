@@ -120,6 +120,15 @@ Tabla `measurements` — una fila por cada red detectada en cada barrido (con su
 
 ---
 
+## 🌐 Servidor y mapa web en tiempo real
+
+La app puede subir sus mediciones a un servidor que las muestra en un **mapa web en vivo**. Ver [`server/README.md`](server/README.md).
+
+- **Backend**: Node.js + Express + WebSocket + PostgreSQL.
+- **API**: `POST /api/measurements` (ingesta), `GET /api/networks` (agregadas), `WS /ws` (broadcast).
+- **Web**: mapa Leaflet (OpenStreetMap) con actualización en tiempo real y fecha de última actualización.
+- En la app: **menú (⋮) → Servidor** para configurar la URL y la API key.
+
 ## 🗺️ Roadmap
 
 Las funcionalidades planificadas (mapa web en tiempo real, API para compartir datos entre dispositivos, fecha de última actualización y juego de conquista de zonas) están detalladas en [`ROADMAP.md`](ROADMAP.md).

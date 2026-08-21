@@ -426,8 +426,46 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         } else if (id == R.id.action_calibrate) {
             showCalibrationDialog();
             return true;
+        } else if (id == R.id.action_server) {
+            showServerDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showServerDialog() {
+        ServerConfig config = ServerConfig.load(this);
+
+        android.widget.EditText urlInput = new android.widget.EditText(this);
+        urlInput.setHint("URL del servidor, ej. http://192.168.0.12:8080");
+        urlInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        urlInput.setText(config.serverUrl);
+
+        android.widget.EditText keyInput = new android.widget.EditText(this);
+        keyInput.setHint("API key");
+        keyInput.setText(config.apiKey);
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        layout.setPadding(pad, pad, pad, 0);
+        layout.addView(urlInput);
+        layout.addView(keyInput);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Servidor remoto")
+                .setMessage("Dónde subir los datos para verlos en el mapa web en tiempo real.")
+                .setView(layout)
+                .setPositiveButton("Guardar", (d, w) -> {
+                    ServerConfig c = new ServerConfig();
+                    c.serverUrl = urlInput.getText().toString().trim();
+                    c.apiKey = keyInput.getText().toString().trim();
+                    c.save(this);
+                    android.widget.Toast.makeText(this, "Servidor guardado", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
     }
 
     private void showCalibrationDialog() {

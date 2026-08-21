@@ -12,6 +12,7 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 - **Servicio en primer plano** (`Foreground Service`): sigue mapeando con la pantalla apagada o usando otras apps, con notificación persistente.
 - **Intervalo de escaneo adaptativo por velocidad**: a mayor velocidad, más escaneos por minuto.
 - **Autocentrado del mapa**: al abrir la app centra en tu posición y solo después activa el seguimiento.
+- **Streaming opcional**: botón para alternar entre subir los datos en tiempo real al servidor (web en vivo) o almacenarlos solo en el dispositivo.
 - **Agrupación por red (SSID)**: fusiona en un punto todas las antenas del mismo nombre.
 - **Trilateración multiseñal** por mínimos cuadrados (Gauss-Newton) con modelo de propagación log-distance.
 - **Menú de calibración**: ajusta la potencia de referencia y el exponente de pérdida para mejorar la precisión según el entorno.
@@ -77,6 +78,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 1. **Abrí la app** y aceptá los permisos (ubicación, dispositivos WiFi cercanos y notificaciones).
 2. **Iniciá el mapeo** (botón flotante). Podés cerrar o apagar la pantalla; el servicio sigue escaneando.
+   - Usá el botón **"Streaming: ON/OFF"** (abajo a la izquierda) para decidir si los datos se suben en vivo al servidor o se guardan solo en el dispositivo.
 3. **Caminá** por la zona a mapear.
 4. Al volver, la app muestra los puntos coloreados por intensidad sobre las cuadras recorridas.
 5. Usá el **menú (⋮)** para **exportar a CSV/KML**, **borrar** los datos o **calibrar** la trilateración (potencia a 1 m y exponente de pérdida).

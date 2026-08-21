@@ -17,6 +17,7 @@ import android.util.Log;
 
 import androidx.core.content.ContextCompat;
 
+import app.mapero.wifi.ServerConfig;
 import app.mapero.wifi.Uploader;
 import app.mapero.wifi.data.AppDatabase;
 import app.mapero.wifi.data.WifiMeasurement;
@@ -196,8 +197,10 @@ public class WifiScanner {
                     Log.e(TAG, "Error guardando", e);
                 }
             });
-            // Sube el mismo lote al servidor en tiempo real.
-            uploader.enqueue(batch);
+            // Sube el mismo lote al servidor solo si el streaming está activo.
+            if (ServerConfig.load(this.context).streaming) {
+                uploader.enqueue(batch);
+            }
         }
     }
 

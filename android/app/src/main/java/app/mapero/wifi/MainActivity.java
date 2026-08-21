@@ -60,6 +60,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     private TextView statusText;
     private MaterialButton scanButton;
     private MaterialButton followButton;
+    private MaterialButton streamButton;
 
     private AppDatabase database;
     private WifiScanner scanner;
@@ -91,6 +92,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         statusText = findViewById(R.id.statusText);
         scanButton = findViewById(R.id.scanButton);
         followButton = findViewById(R.id.followButton);
+        streamButton = findViewById(R.id.streamButton);
 
         mapView.setMultiTouchControls(true);
         mapView.setUseDataConnection(true);
@@ -127,6 +129,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
         setupFollowUi();
         updateFollowButton();
+        updateStreamButton();
 
         // Observa las mediciones, las agrega por trilateración y pinta los puntos
         Observer<List<WifiMeasurement>> observer = data -> {
@@ -229,6 +232,13 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     // ---- Seguimiento de posición GPS ----
 
     private void setupFollowUi() {
+        streamButton.setOnClickListener(v -> {
+            ServerConfig config = ServerConfig.load(this);
+            config.streaming = !config.streaming;
+            config.save(this);
+            updateStreamButton();
+        });
+
         followButton.setOnClickListener(v -> {
             followMode = !followMode;
             updateFollowButton();
@@ -278,6 +288,11 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
     private void updateFollowButton() {
         followButton.setText(followMode ? R.string.follow_on : R.string.follow_off);
+    }
+
+    private void updateStreamButton() {
+        boolean streaming = ServerConfig.load(this).streaming;
+        streamButton.setText(streaming ? R.string.stream_on : R.string.stream_off);
     }
 
     // ---- WifiScanner.Listener ----

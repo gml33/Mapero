@@ -16,13 +16,17 @@ public final class ServerConfig {
     private static final String PREFS = "server";
     private static final String KEY_URL = "serverUrl";
     private static final String KEY_KEY = "apiKey";
+    private static final String KEY_STREAMING = "streaming";
 
     public String serverUrl;
     public String apiKey;
+    /** Si true, sube los datos en tiempo real al servidor; si false, solo local. */
+    public boolean streaming;
 
     public ServerConfig() {
         serverUrl = DEFAULT_URL;
         apiKey = DEFAULT_API_KEY;
+        streaming = true;
     }
 
     public static ServerConfig load(Context context) {
@@ -30,6 +34,7 @@ public final class ServerConfig {
         SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         c.serverUrl = sp.getString(KEY_URL, DEFAULT_URL);
         c.apiKey = sp.getString(KEY_KEY, DEFAULT_API_KEY);
+        c.streaming = sp.getBoolean(KEY_STREAMING, true);
         return c;
     }
 
@@ -38,6 +43,7 @@ public final class ServerConfig {
                 .edit()
                 .putString(KEY_URL, serverUrl)
                 .putString(KEY_KEY, apiKey)
+                .putBoolean(KEY_STREAMING, streaming)
                 .apply();
     }
 }

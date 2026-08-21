@@ -71,18 +71,19 @@ function refreshAll() {
     'última actualización: ' + new Date().toLocaleTimeString();
 }
 
-// Carga inicial
-async function loadInitial() {
+// Carga / refresco de redes (limpiando antes para no duplicar)
+async function loadNetworks() {
   try {
     const res = await fetch('/api/networks');
     const rows = await res.json();
+    networks.forEach((n) => { if (n.marker) map.removeLayer(n.marker); });
+    networks.clear();
     for (const r of rows) {
-      const rssi = Number(r.rssi);
-      ingest(r.name, r.name, Number(r.latitude), Number(r.longitude), rssi);
+      ingest(r.name, r.name, Number(r.latitude), Number(r.longitude), Number(r.rssi));
     }
     refreshAll();
   } catch (e) {
-    console.error('error carga inicial', e);
+    console.error('error carga de redes', e);
   }
 }
 
@@ -219,8 +220,8 @@ function scheduleRefresh() {
 }
 
 centerOnLastPosition();
-loadInitial();
+loadNetworks();
 loadTerritories();
 loadLeaderboard();
-setInterval(() => { loadTerritories(); loadLeaderboard(); }, 30000);
+setInterval(() => { loadNetworks(); loadTerritories(); loadLeaderboard(); }, 30000);
 connect();

@@ -5,9 +5,6 @@
     <string name="no_wifi">Habilita el WiFi para escanear</string>
     <string name="gps_waiting">Esperando GPS… (%1$d AP detectados)</string>
     <string name="stopped">Detenido</string>
-    <string name="legend_strong">Fuerte (≥ -60)</string>
-    <string name="legend_good">Media (-60 a -75)</string>
-    <string name="legend_weak">Débil (≤ -75)</string>
     <string name="follow_on">Seguir: ON</string>
     <string name="center">Centrar</string>
     <string name="stream_on">Streaming: ON</string>

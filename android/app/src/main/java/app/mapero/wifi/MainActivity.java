@@ -654,8 +654,58 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         } else if (id == R.id.action_filter) {
             showFilterDialog();
             return true;
+        } else if (id == R.id.action_search) {
+            showSearchDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showSearchDialog() {
+        if (lastSummaries == null || lastSummaries.isEmpty()) {
+            Toast.makeText(this, "Todavía no hay redes mapeadas", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        for (WifiApSummary ap : lastSummaries) {
+            String n = nameFor(ap);
+            if (n != null && !n.isEmpty()) names.add(n);
+        }
+        String[] arr = names.toArray(new String[0]);
+
+        android.widget.AutoCompleteTextView input =
+                new android.widget.AutoCompleteTextView(this);
+        input.setHint("Nombre de la red");
+        input.setAdapter(new android.widget.ArrayAdapter<>(this,
+                android.R.layout.simple_dropdown_item_1line, arr));
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Buscar red")
+                .setMessage("Elegí una red para ir a su ubicación en el mapa.")
+                .setView(input)
+                .setPositiveButton("Ir", (d, w) -> {
+                    String query = input.getText().toString().trim();
+                    gotoNetwork(query);
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private void gotoNetwork(String query) {
+        if (query.isEmpty()) return;
+        for (WifiApSummary ap : lastSummaries) {
+            if (nameFor(ap).equalsIgnoreCase(query)) {
+                GeoPoint p = new GeoPoint(ap.avgLatitude, ap.avgLongitude);
+                mapView.getController().animateTo(p);
+                Marker marker = markerByBssid.get(ap.bssid);
+                if (marker != null) {
+                    marker.setEnabled(true);
+                    marker.showInfoWindow();
+                }
+                return;
+            }
+        }
+        Toast.makeText(this, "Red no encontrada", Toast.LENGTH_SHORT).show();
     }
 
     private void showFilterDialog() {

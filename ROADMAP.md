@@ -65,15 +65,15 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 ### Pendientes
 - Aplicar el filtro también a exportaciones y conteos (hoy solo afecta el mapa).
 
-## 6. Búsqueda de redes por nombre
-- Campo de búsqueda donde se escribe el **nombre (SSID)** de una red.
-- Al elegir/confirmar, la cámara se mueve **directamente al punto** del mapa donde está esa red (desplaza y hace zoom, muestra su marcador e info).
-- Autocompletado a partir de los SSID ya guardados.
+## 6. ✅ Búsqueda de redes por nombre — implementada
+- Menú **Buscar** en la app: autocompletado con los SSID ya mapeados.
+- Al elegir una red, el mapa se desplaza a su ubicación, muestra su marcador y abre su burbuja de información.
+- 100 % local (usa los datos guardados en el dispositivo).
 
-### Consideraciones
-- Buscar en los SSID de `lastSummaries` (pueden repetirse si hay varias con el mismo nombre en distinta zona; mostrar la lista para elegir).
-- Al localizar, centrar el mapa en el marcador correspondiente (reutiliza la lógica de `setCenter`/`animateTo`) y opcionalmente abrir su burbuja de información.
-- Puede funcionar 100 % local, sin depender del backend.
+## 6b. ✅ Filtros combinados en el panel (mediciones)
+- En **/admin → Mediciones**, además de usuario/fechas/nombre/MAC: filtros por **tipo** (abiertas/protegidas), **banda** (2,4/5 GHz) y **señal mínima**.
+- La app ahora **sube `capabilities`** de cada red al servidor (columna nueva, preserva datos).
+- La tabla muestra columnas **Tipo** y **Banda**.
 
 ---
 

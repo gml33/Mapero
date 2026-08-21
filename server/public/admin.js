@@ -57,6 +57,17 @@ document.querySelectorAll('nav button').forEach((b) => {
 
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
+function isOpen(caps) {
+  caps = String(caps || '');
+  if (!caps) return true;
+  return !/WPA|WEP|RSN|SAE|PSK/.test(caps);
+}
+function bandLabel(freq) {
+  freq = Number(freq);
+  if (!freq) return '—';
+  return freq < 3000 ? '2,4 GHz' : '5 GHz';
+}
+
 // ---- Render ----
 function renderAll(view) {
   if (!view) view = document.querySelector('nav button.active').dataset.view;
@@ -163,7 +174,7 @@ let meas = { offset: 0, limit: 50, filters: {}, sort: 'ts', dir: 'desc' };
 async function loadMeasurements() {
   const p = new URLSearchParams({ limit: meas.limit, offset: meas.offset,
     sort: meas.sort, dir: meas.dir });
-  for (const k of ['user', 'from', 'to', 'q', 'mac']) {
+  for (const k of ['user', 'from', 'to', 'q', 'mac', 'type', 'band', 'sig']) {
     if (meas.filters[k]) p.set(k, meas.filters[k]);
   }
   const d = await api('/api/admin/measurements?' + p.toString());
@@ -186,6 +197,25 @@ async function renderMeasurements(d) {
         <field><label>Hasta</label><input id="f_to" type="date" value="${esc(meas.filters.to || '')}"></field>
         <field><label>Nombre de red</label><input id="f_q" value="${esc(meas.filters.q || '')}"></field>
         <field><label>MAC / BSSID</label><input id="f_mac" value="${esc(meas.filters.mac || '')}"></field>
+        <field><label>Tipo</label>
+          <select id="f_type">
+            <option value="">Todos</option>
+            <option value="open" ${meas.filters.type === 'open' ? 'selected' : ''}>Abiertas</option>
+            <option value="protected" ${meas.filters.type === 'protected' ? 'selected' : ''}>Protegidas</option>
+          </select></field>
+        <field><label>Banda</label>
+          <select id="f_band">
+            <option value="">Todas</option>
+            <option value="2.4" ${meas.filters.band === '2.4' ? 'selected' : ''}>2,4 GHz</option>
+            <option value="5" ${meas.filters.band === '5' ? 'selected' : ''}>5 GHz</option>
+          </select></field>
+        <field><label>Señal mínima</label>
+          <select id="f_sig">
+            <option value="">Todas</option>
+            <option value="-80" ${meas.filters.sig === '-80' ? 'selected' : ''}>≥ -80 dBm</option>
+            <option value="-70" ${meas.filters.sig === '-70' ? 'selected' : ''}>≥ -70 dBm</option>
+            <option value="-60" ${meas.filters.sig === '-60' ? 'selected' : ''}>≥ -60 dBm</option>
+          </select></field>
         <field><button type="submit">Aplicar</button>
           <button type="button" class="ghost" style="color:#00695c;border:1px solid #00695c" onclick="resetFilters()">Limpiar</button></field>
       </form>
@@ -203,12 +233,16 @@ async function renderMeasurements(d) {
           ${th('ssid', 'SSID')}
           ${th('bssid', 'BSSID')}
           ${th('rssi', 'RSSI')}
+          <th>Tipo</th>
+          <th>Banda</th>
           <th>Pos</th>
           ${th('ts', 'Fecha')}
         </tr>
         ${d.rows.map((m) => `<tr>
           <td>${esc(m.username)}</td><td>${esc(m.ssid)}</td><td>${esc(m.bssid)}</td>
           <td>${m.rssi}</td>
+          <td>${isOpen(m.capabilities) ? 'Abierta' : 'Protegida'}</td>
+          <td>${bandLabel(m.frequency)}</td>
           <td>${m.latitude.toFixed(4)}, ${m.longitude.toFixed(4)}</td>
           <td>${new Date(m.ts).toLocaleString()}</td>
         </tr>`).join('')}
@@ -223,6 +257,9 @@ async function renderMeasurements(d) {
       to: $('f_to').value || '',
       q: $('f_q').value.trim(),
       mac: $('f_mac').value.trim(),
+      type: $('f_type').value,
+      band: $('f_band').value,
+      sig: $('f_sig').value,
     };
     meas.offset = 0;
     loadMeasurements();

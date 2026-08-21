@@ -103,11 +103,11 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
       }
       const r = await pool.query(
         `INSERT INTO measurements
-           (user_id, bssid, ssid, latitude, longitude, rssi, frequency, ts)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-         RETURNING bssid, ssid, latitude, longitude, rssi, frequency, ts`,
+           (user_id, bssid, ssid, latitude, longitude, rssi, frequency, capabilities, ts)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         RETURNING bssid, ssid, latitude, longitude, rssi, frequency, capabilities, ts`,
         [req.user.id, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
-         m.frequency || null, new Date(ts)]);
+         m.frequency || null, m.capabilities || '', new Date(ts)]);
       inserted.push(r.rows[0]);
     }
 
@@ -315,6 +315,27 @@ app.get('/api/admin/measurements', requireAdmin, async (req, res) => {
     if (req.query.q) { params.push('%' + req.query.q + '%'); cond.push('m.ssid ILIKE $' + params.length); }
     if (req.query.mac) { params.push('%' + req.query.mac + '%'); cond.push('m.bssid ILIKE $' + params.length); }
 
+    // Filtros combinados: tipo de seguridad, banda y señal mínima.
+    if (req.query.type === 'open') {
+      cond.push(`(m.capabilities IS NULL OR m.capabilities = ''
+                 OR (m.capabilities NOT ILIKE '%WPA%' AND m.capabilities NOT ILIKE '%WEP%'
+                     AND m.capabilities NOT ILIKE '%RSN%' AND m.capabilities NOT ILIKE '%SAE%'
+                     AND m.capabilities NOT ILIKE '%PSK%'))`);
+    } else if (req.query.type === 'protected') {
+      cond.push(`(m.capabilities ILIKE '%WPA%' OR m.capabilities ILIKE '%WEP%'
+                  OR m.capabilities ILIKE '%RSN%' OR m.capabilities ILIKE '%SAE%'
+                  OR m.capabilities ILIKE '%PSK%')`);
+    }
+    if (req.query.band === '2.4') {
+      cond.push('m.frequency > 0 AND m.frequency < 3000');
+    } else if (req.query.band === '5') {
+      cond.push('m.frequency >= 3000');
+    }
+    if (req.query.sig) {
+      params.push(Number(req.query.sig));
+      cond.push('m.rssi >= $' + params.length);
+    }
+
     const where = cond.length ? ' WHERE ' + cond.join(' AND ') : '';
 
     // Ordenamiento: whitelist de columnas para evitar inyección SQL.
@@ -325,7 +346,7 @@ app.get('/api/admin/measurements', requireAdmin, async (req, res) => {
 
     params.push(limit, offset);
     const pageSql = `SELECT m.id, u.username, m.bssid, m.ssid, m.latitude, m.longitude,
-                        m.rssi, m.ts
+                        m.rssi, m.frequency, m.capabilities, m.ts
                      FROM measurements m JOIN users u ON u.id = m.user_id
                      ${where} ORDER BY ${sortCol} ${dir}, m.id ${dir} LIMIT $${params.length - 1}
                      OFFSET $${params.length}`;

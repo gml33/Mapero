@@ -21,6 +21,7 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 - **Color por intensidad** de señal (verde / ámbar / rojo).
 - **Filtrado por zoom**: en zonas con muchas redes muestra según el nivel de acercamiento, priorizando las de mayor señal en zoom lejano.
 - **Filtros de red**: filtrar el mapa por tipo (abiertas/protegidas), banda (2,4/5 GHz) y señal mínima, desde el menú (⋮) → Filtros.
+- **Buscar red**: menú (⋮) → Buscar, autocompleta los SSID y centra el mapa en su ubicación.
 - **Animación sutil** ("pulso") al aparecer una red nueva.
 - **Burbuja de información** al tocar un punto (nombre de la red + señal + muestras), con botón de cierre.
 - **Exportación a CSV y KML** (compatible con Google Earth).

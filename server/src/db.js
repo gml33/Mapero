@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS measurements (
   longitude   DOUBLE PRECISION NOT NULL,
   rssi        INTEGER NOT NULL,
   frequency   INTEGER,
+  capabilities TEXT,
   ts          TIMESTAMPTZ NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -59,6 +60,8 @@ export async function initDb() {
   await pool.query(SCHEMA);
   // Asegura la columna de rol en usuarios ya existentes.
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`);
+  // Asegura la columna de capabilities en mediciones ya existentes.
+  await pool.query(`ALTER TABLE measurements ADD COLUMN IF NOT EXISTS capabilities TEXT`);
   // Siembra los valores por defecto de configuración.
   for (const [k, v] of Object.entries(DEFAULTS)) {
     await pool.query(

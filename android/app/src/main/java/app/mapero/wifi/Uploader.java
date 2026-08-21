@@ -97,6 +97,7 @@ public class Uploader {
             o.put("longitude", m.longitude);
             o.put("rssi", m.rssi);
             o.put("frequency", m.frequency);
+            o.put("capabilities", m.capabilities == null ? "" : m.capabilities);
             o.put("timestamp", m.timestamp);
             arr.put(o);
         }

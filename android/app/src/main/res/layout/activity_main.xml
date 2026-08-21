@@ -102,7 +102,7 @@
     <!-- Overlay lateral: seguir posición GPS -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/followButton"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        style="@style/Widget.Material3.Button.OutlinedButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="end|center_vertical"
@@ -110,5 +110,17 @@
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:text="@string/follow_on" />
+
+    <!-- Overlay lateral: centrar el mapa en la posición del teléfono -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/centerButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="12dp"
+        android:layout_marginTop="72dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="@string/center" />
 
 </FrameLayout>

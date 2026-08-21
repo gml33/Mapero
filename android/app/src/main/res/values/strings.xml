@@ -9,6 +9,7 @@
     <string name="legend_good">Media (-60 a -75)</string>
     <string name="legend_weak">Débil (≤ -75)</string>
     <string name="follow_on">Seguir: ON</string>
+    <string name="center">Centrar</string>
     <string name="stream_on">Streaming: ON</string>
     <string name="stream_off">Streaming: OFF</string>
     <string name="follow_off">Seguir: OFF</string>

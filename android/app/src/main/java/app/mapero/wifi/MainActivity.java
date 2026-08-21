@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     private MaterialButton scanButton;
     private MaterialButton followButton;
     private MaterialButton streamButton;
+    private MaterialButton centerButton;
 
     private AppDatabase database;
     private WifiScanner scanner;
@@ -93,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         scanButton = findViewById(R.id.scanButton);
         followButton = findViewById(R.id.followButton);
         streamButton = findViewById(R.id.streamButton);
+        centerButton = findViewById(R.id.centerButton);
 
         mapView.setMultiTouchControls(true);
         mapView.setUseDataConnection(true);
@@ -232,6 +234,16 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     // ---- Seguimiento de posición GPS ----
 
     private void setupFollowUi() {
+        centerButton.setOnClickListener(v -> {
+            android.location.Location loc = follower.getLastLocation();
+            if (loc != null) {
+                mapView.getController().animateTo(
+                        new GeoPoint(loc.getLatitude(), loc.getLongitude()));
+            } else {
+                Toast.makeText(this, "Todavía sin posición GPS", Toast.LENGTH_SHORT).show();
+            }
+        });
+
         streamButton.setOnClickListener(v -> {
             ServerConfig config = ServerConfig.load(this);
             config.streaming = !config.streaming;

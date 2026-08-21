@@ -18,6 +18,7 @@ public final class ServerConfig {
     private static final String KEY_PASS = "password";
     private static final String KEY_TOKEN = "token";
     private static final String KEY_STREAMING = "streaming";
+    private static final String KEY_LAST_UPLOADED = "lastUploaded";
 
     public String serverUrl;
     public String username;
@@ -25,6 +26,8 @@ public final class ServerConfig {
     public String token;
     /** Si true, sube los datos en tiempo real al servidor; si false, solo local. */
     public boolean streaming;
+    /** Último timestamp de medición ya subido al servidor. */
+    public long lastUploaded;
 
     public ServerConfig() {
         serverUrl = DEFAULT_URL;
@@ -32,6 +35,7 @@ public final class ServerConfig {
         password = "";
         token = "";
         streaming = true;
+        lastUploaded = 0L;
     }
 
     public static ServerConfig load(Context context) {
@@ -42,6 +46,7 @@ public final class ServerConfig {
         c.password = sp.getString(KEY_PASS, "");
         c.token = sp.getString(KEY_TOKEN, "");
         c.streaming = sp.getBoolean(KEY_STREAMING, true);
+        c.lastUploaded = sp.getLong(KEY_LAST_UPLOADED, 0L);
         return c;
     }
 
@@ -53,6 +58,7 @@ public final class ServerConfig {
                 .putString(KEY_PASS, password)
                 .putString(KEY_TOKEN, token)
                 .putBoolean(KEY_STREAMING, streaming)
+                .putLong(KEY_LAST_UPLOADED, lastUploaded)
                 .apply();
     }
 

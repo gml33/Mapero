@@ -91,6 +91,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     private Calibration calibration;
     private java.util.List<WifiMeasurement> lastData;
     private java.util.List<WifiApSummary> lastSummaries;
+    private Uploader syncUploader;
 
     private final List<Polygon> territoryPolygons = new ArrayList<>();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
@@ -139,6 +140,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         calibration = Calibration.load(this);
         scanner = WifiScannerHolder.get(this);
         follower = new LocationHelper(this);
+        syncUploader = new Uploader(this);
 
         scanButton.setOnClickListener(v -> {
             if (scanning) {
@@ -270,6 +272,9 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
             config.streaming = !config.streaming;
             config.save(this);
             updateStreamButton();
+            if (config.streaming) {
+                syncUploader.syncAll(); // sube lo recolectado con streaming apagado
+            }
         });
 
         followButton.setOnClickListener(v -> {
@@ -650,6 +655,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
                             "Conectado como \"" + user + "\"", Toast.LENGTH_LONG).show();
                     updateStreamButton();
                 });
+                syncUploader.syncAll(); // sube lo pendiente al conectar
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(MainActivity.this,
                         "No se pudo conectar: " + e.getMessage(), Toast.LENGTH_LONG).show());

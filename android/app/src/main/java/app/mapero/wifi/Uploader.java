@@ -14,7 +14,10 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import app.mapero.wifi.data.AppDatabase;
 import app.mapero.wifi.data.WifiMeasurement;
+
+import java.util.ArrayList;
 
 /**
  * Sube las mediciones al servidor Mapero en tiempo real.
@@ -37,6 +40,45 @@ public class Uploader {
                 send(batch);
             } catch (Exception e) {
                 Log.w(TAG, "fallo al subir: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Sube en lote todas las mediciones locales que aún no se subieron
+     * (usado al reconectar el streaming). Avanza el marcador lastUploaded.
+     */
+    public void syncAll() {
+        executor.execute(() -> {
+            try {
+                ServerConfig config = ServerConfig.load(context);
+                if (!config.hasToken()) return;
+
+                List<WifiMeasurement> all =
+                        AppDatabase.getInstance(context).wifiDao().getAll();
+                List<WifiMeasurement> pending = new ArrayList<>();
+                long maxTs = config.lastUploaded;
+                for (WifiMeasurement m : all) {
+                    if (m.timestamp > config.lastUploaded) {
+                        pending.add(m);
+                        if (m.timestamp > maxTs) maxTs = m.timestamp;
+                    }
+                }
+                if (pending.isEmpty()) return;
+
+                final int CHUNK = 100;
+                int sent = 0;
+                for (int i = 0; i < pending.size(); i += CHUNK) {
+                    List<WifiMeasurement> chunk =
+                            pending.subList(i, Math.min(i + CHUNK, pending.size()));
+                    send(new ArrayList<>(chunk));
+                    sent += chunk.size();
+                }
+                config.lastUploaded = maxTs;
+                config.save(context);
+                Log.d(TAG, "sync: subidos " + sent + " pendientes");
+            } catch (Exception e) {
+                Log.w(TAG, "sync falló: " + e.getMessage());
             }
         });
     }

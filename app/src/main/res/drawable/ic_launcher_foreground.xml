@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Símbolo WiFi centrado sobre un punto de ubicación (pín). -->
+    <path
+        android:pathData="M28,72 A26,26 0 0,1 80,72"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M36,72 A18,18 0 0,1 72,72"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M44,72 A10,10 0 0,1 64,72"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- Punto de ubicación (base del símbolo WiFi). -->
+    <path
+        android:pathData="M54,72 m -4.5,0 a4.5,4.5 0 1,1 9,0 a4.5,4.5 0 1,1 -9,0"
+        android:fillColor="#FFFFFF" />
+</vector>

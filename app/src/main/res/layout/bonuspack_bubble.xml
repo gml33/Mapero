@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bubble"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="#E6000000"
+    android:padding="12dp"
+    android:maxWidth="260dp">
+
+    <ImageButton
+        android:id="@+id/bubble_close"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Cerrar"
+        android:padding="4dp"
+        android:src="@drawable/ic_close" />
+
+    <LinearLayout
+        android:id="@+id/bubble_center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="24dp"
+        android:orientation="vertical"
+        android:maxWidth="220dp">
+
+        <ImageView
+            android:id="@+id/bubble_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/bubble_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bubble_description"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#DDDDDD"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/bubble_subdescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#BBBBBB"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+</RelativeLayout>

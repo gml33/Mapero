@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mapero</string>
+    <string name="scanning">Escaneando… %1$d AP</string>
+    <string name="no_wifi">Habilita el WiFi para escanear</string>
+    <string name="gps_waiting">Esperando GPS… (%1$d AP detectados)</string>
+    <string name="stopped">Detenido</string>
+    <string name="legend_strong">Fuerte (≥ -60)</string>
+    <string name="legend_good">Media (-60 a -75)</string>
+    <string name="legend_weak">Débil (≤ -75)</string>
+    <string name="follow_on">Seguir: ON</string>
+    <string name="follow_off">Seguir: OFF</string>
+    <string name="start">Iniciar mapeo</string>
+    <string name="stop">Detener</string>
+</resources>

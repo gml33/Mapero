@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+
+# Android Studio / IDE
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android local config (no versionar)
+local.properties
+
+# Salidas
+app/build/
+
+# OS
+.DS_Store

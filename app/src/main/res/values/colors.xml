@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#1A237E</color>
+    <color name="white">#FFFFFF</color>
+    <color name="signal_strong">#2E7D32</color>
+    <color name="signal_good">#F9A825</color>
+    <color name="signal_weak">#C62828</color>
+</resources>

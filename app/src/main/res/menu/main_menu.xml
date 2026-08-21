@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_export_csv"
+        android:title="Exportar CSV" />
+    <item
+        android:id="@+id/action_export_kml"
+        android:title="Exportar KML" />
+    <item
+        android:id="@+id/action_clear"
+        android:title="Borrar datos" />
+    <item
+        android:id="@+id/action_calibrate"
+        android:title="Calibrar" />
+</menu>

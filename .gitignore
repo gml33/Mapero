@@ -19,5 +19,8 @@ android/app/build/
 server/node_modules/
 server/.env
 
+# Variables del stack (no versionar secretos)
+.env
+
 # OS
 .DS_Store

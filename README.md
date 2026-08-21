@@ -145,6 +145,7 @@ La app puede subir sus mediciones a un servidor que las muestra en un **mapa web
 - **Backend**: Node.js + Express + WebSocket + PostgreSQL.
 - **API**: `POST /api/measurements` (ingesta), `GET /api/networks` (agregadas), `WS /ws` (broadcast).
 - **Web**: mapa Leaflet (OpenStreetMap) con actualización en tiempo real y fecha de última actualización.
+- **Docker**: el stack completo (backend + PostgreSQL) corre con `docker compose up -d --build` para desplegarlo en un VPS. Variables en `.env.example`.
 - En la app: **menú (⋮) → Servidor** para configurar la URL y la API key.
 
 ## 🗺️ Roadmap

@@ -1,0 +1,34 @@
+# Stack web Mapero: backend (Node) + PostgreSQL
+# Uso: docker compose up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mapero
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mapero_dev}
+      POSTGRES_DB: mapero
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mapero -d mapero"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://mapero:${POSTGRES_PASSWORD:-mapero_dev}@db:5432/mapero
+      API_KEY: ${API_KEY:-mapero_dev_key}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports:
+      - "${PORT:-8080}:8080"
+
+volumes:
+  pgdata:

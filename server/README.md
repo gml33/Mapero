@@ -27,13 +27,42 @@ Variables de `.env`:
 | `API_KEY` | `mapero_dev_key` | Clave de escritura usada por la app |
 | `CORS_ORIGIN` | `*` | Origen permitido para CORS |
 
-## Ejecutar
+## Ejecutar (local)
 
 ```bash
 npm start          # o: npm run dev (reinicia ante cambios)
 ```
 
 Al arrancar crea automáticamente las tablas (`devices`, `measurements`).
+
+## Ejecutar con Docker (recomendado para producción/VPS)
+
+Desde la raíz del proyecto (donde está `docker-compose.yml`), el stack levanta **PostgreSQL + backend/web**:
+
+```bash
+# Variables (opcional; hay valores por defecto para dev)
+export POSTGRES_PASSWORD=clave_segura
+export API_KEY=clave_api
+export PORT=8080
+
+# Construir y levantar
+docker compose up -d --build
+```
+
+- `db`: PostgreSQL 16 con volumen persistente (`pgdata`).
+- `web`: imagen del backend (ver `server/Dockerfile`), espera a que la DB esté sana y expone el puerto.
+- Las variables se pasan vía entorno: `DATABASE_URL`, `API_KEY`, `CORS_ORIGIN`, `PORT`.
+
+Para detener: `docker compose down` (con `-v` borra también el volumen de datos).
+
+## Despliegue en un VPS
+
+1. Llevá el proyecto (o el `docker-compose.yml` + `server/`) al VPS.
+2. Instalá Docker y Docker Compose.
+3. Configurá las variables (`POSTGRES_PASSWORD`, `API_KEY`) — para producción, con una **API key fuerte**.
+4. `docker compose up -d --build`.
+5. Exponé el puerto (80/443) y, si usás HTTPS, un *reverse proxy* (Caddy/nginx) hacia el puerto del contenedor.
+6. En cada dispositivo Android, configurá la URL del servidor (IP/dominio público) en **Mapero → menú (⋮) → Servidor**.
 
 ## Endpoints
 

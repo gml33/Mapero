@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool, initDb } from './db.js';
+import { buildTerritories } from './territories.js';
 
 dotenv.config();
 
@@ -47,11 +48,12 @@ app.post('/api/measurements', checkKey, async (req, res) => {
   }
 
   try {
-    // Auto-registro del dispositivo según su API key.
+    // Auto-registro del jugador según su nombre (identidad de la competencia).
+    const playerName = (req.headers['x-device-name'] || 'jugador').slice(0, 40);
     const dev = await pool.query(
-      'INSERT INTO devices (api_key, name) VALUES ($1, $2) ' +
-      'ON CONFLICT (api_key) DO UPDATE SET name = EXCLUDED.name ' +
-      'RETURNING id', [API_KEY, req.headers['x-device-name'] || 'android']);
+      'INSERT INTO devices (name, api_key) VALUES ($1, $2) ' +
+      'ON CONFLICT (name) DO UPDATE SET api_key = EXCLUDED.api_key ' +
+      'RETURNING id', [playerName, API_KEY]);
     const deviceId = dev.rows[0].id;
 
     const inserted = [];
@@ -91,6 +93,21 @@ app.get('/api/networks', async (_req, res) => {
     res.json(rows);
   } catch (e) {
     console.error('[api] error networks:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// ---- Territorios del juego de conquista ----
+app.get('/api/territories', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.device_id, d.name, m.latitude, m.longitude, m.ts
+       FROM measurements m
+       JOIN devices d ON d.id = m.device_id
+       WHERE m.ts > now() - interval '30 days'`);
+    res.json(buildTerritories(rows));
+  } catch (e) {
+    console.error('[api] error territories:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });

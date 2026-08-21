@@ -34,17 +34,18 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 - Mantener un campo `lastUpdated` en la base/local o el estado del mapa.
 - Formato legible ("hace 5 min", "ayer 18:32") y actualización al escanear/sincronizar.
 
-## 4. Juego de conquista de zonas (modo competitivo)
-- Dividir el mapa en **zonas/celdas** (cuadrícula o celdas hexagonales).
-- Cada usuario/equipo "conquista" una celda al aportar **más cobertura** (señal, cantidad de redes detectadas) que otros.
-- Puntuación y ranking entre personas para competir.
-- Reutiliza los datos ya recopilados (redes + señal + posición).
+## 4. ✅ Juego de conquista de zonas (modo competitivo) — v1 implementada
+- Celdas **hexagonales H3 ~150 m** (resolución 10).
+- Regla **cobertura + decaimiento**: por celda, cada medición aporta un peso que decae con el tiempo (~7 días); el dueño es quien más cobertura acumulada tiene.
+- Competencia **individual**: cada jugador se identifica por nombre (`x-device-name`).
+- Endpoint `GET /api/territories` (dueño de cada hexágono + score).
+- **Web**: hexágonos coloreados por dueño (H3) + panel de ranking.
+- **App**: nombre de jugador (menú Servidor) y superposición de territorios en el mapa.
 
-### Consideraciones
-- Definir métrica de "conquista" (p. ej. redes únicas por celda, intensidad acumulada, tiempo).
-- Resolución de conflictos cuando dos personas mapean la misma zona.
-- Anti-cheat / validación de datos (depende de la autenticación del punto 2).
-- Requiere el backend de los puntos 1 y 2 para que la competencia sea entre dispositivos.
+### Pendientes / ideas
+- Autenticación real por jugador (token) y anti-cheat.
+- Decaimiento configurable y "guerra" por defensa de territorios.
+- Detalle de celdas vecinas y "frentes" entre jugadores.
 
 ---
 

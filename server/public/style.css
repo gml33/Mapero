@@ -24,6 +24,29 @@ header h1 { font-size: 18px; font-weight: 700; }
 .count { font-size: 13px; }
 .last { margin-left: auto; font-size: 12px; opacity: 0.9; }
 
+#ranking {
+  position: fixed;
+  top: 66px; right: 12px;
+  z-index: 1000;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  min-width: 150px;
+  max-height: 60vh;
+  overflow: auto;
+}
+#ranking h2 { font-size: 14px; margin-bottom: 6px; }
+#rankingList { list-style: none; }
+#rankingList li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 0;
+}
+#rankingList .chip { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+#rankingList .name { flex: 1; }
+#rankingList .n { font-weight: 700; }
+
 #legend {
   position: fixed;
   bottom: 14px; left: 14px;

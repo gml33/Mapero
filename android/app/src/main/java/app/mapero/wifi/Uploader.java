@@ -69,6 +69,9 @@ public class Uploader {
             conn.setReadTimeout(5000);
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("x-api-key", config.apiKey);
+            if (config.playerName != null && !config.playerName.isEmpty()) {
+                conn.setRequestProperty("x-device-name", config.playerName);
+            }
             conn.setDoOutput(true);
 
             byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);

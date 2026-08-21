@@ -110,6 +110,61 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ---- Juego de conquista (territorios) ----
+
+let territoryLayer = L.layerGroup().addTo(map);
+let rankingByOwner = new Map();
+
+function colorForOwner(name) {
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `hsl(${h}, 70%, 45%)`;
+}
+
+async function loadTerritories() {
+  try {
+    const res = await fetch('/api/territories');
+    const data = await res.json();
+    territoryLayer.clearLayers();
+    rankingByOwner = new Map();
+
+    for (const t of data) {
+      const color = colorForOwner(t.owner);
+      const boundary = h3.cellToBoundary(t.hex, true); // [lng,lat]
+      const poly = L.polygon(boundary.map(p => [p[1], p[0]]), {
+        color: color, weight: 1, fillColor: color, fillOpacity: 0.45,
+      }).addTo(territoryLayer)
+        .bindPopup(`<b>${esc(t.owner)}</b><br>cobertura: ${t.score}<br>${t.count} muestras`);
+
+      const acc = rankingByOwner.get(t.owner) || { owner: t.owner, n: 0, score: 0 };
+      acc.n++;
+      acc.score += t.score;
+      rankingByOwner.set(t.owner, acc);
+    }
+
+    renderRanking();
+  } catch (e) {
+    console.error('error territorios', e);
+  }
+}
+
+function renderRanking() {
+  const list = [...rankingByOwner.values()].sort((a, b) => b.score - a.score);
+  const el = document.getElementById('rankingList');
+  el.innerHTML = list.map(r =>
+    `<li><span class="chip" style="background:${colorForOwner(r.owner)}"></span>` +
+    `<span class="name">${esc(r.owner)}</span><span class="n">${r.n} cel · ${Math.round(r.score)}</span></li>`
+  ).join('') || '<li>Sin territorios aún</li>';
+}
+
+let terrTimer = null;
+function scheduleTerritories() {
+  clearTimeout(terrTimer);
+  terrTimer = setTimeout(loadTerritories, 800);
+}
+
 centerOnLastPosition();
 loadInitial();
+loadTerritories();
+setInterval(loadTerritories, 30000); // refresco periódico
 connect();

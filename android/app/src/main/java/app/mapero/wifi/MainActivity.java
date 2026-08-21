@@ -7,6 +7,8 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.view.GestureDetector;
 import android.view.Menu;
@@ -15,6 +17,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -46,6 +51,16 @@ import org.osmdroid.events.ZoomEvent;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
+import org.osmdroid.views.overlay.Polygon;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,6 +91,10 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     private Calibration calibration;
     private java.util.List<WifiMeasurement> lastData;
     private java.util.List<WifiApSummary> lastSummaries;
+
+    private final List<Polygon> territoryPolygons = new ArrayList<>();
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private static final double TERRITORY_RADIUS_M = 75.0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,6 +151,8 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         setupFollowUi();
         updateFollowButton();
         updateStreamButton();
+
+        uiHandler.post(territoryLoop);
 
         // Observa las mediciones, las agrega por trilateración y pinta los puntos
         Observer<List<WifiMeasurement>> observer = data -> {
@@ -318,6 +339,99 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         }
     }
 
+    // ---- Territorios (juego de conquista) ----
+
+    private final Runnable territoryLoop = new Runnable() {
+        @Override
+        public void run() {
+            refreshTerritories();
+            uiHandler.postDelayed(this, 20000);
+        }
+    };
+
+    private void refreshTerritories() {
+        ioExecutor.execute(() -> {
+            try {
+                ServerConfig config = ServerConfig.load(this);
+                if (config.serverUrl == null || config.serverUrl.isEmpty()) return;
+                URL url = new URL(config.serverUrl + "/api/territories");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                try {
+                    int code = conn.getResponseCode();
+                    if (code != 200) return;
+                    String body = readAll(conn.getInputStream());
+                    JSONArray arr = new JSONArray(body);
+
+                    List<Polygon> polys = new ArrayList<>();
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject o = arr.getJSONObject(i);
+                        double lat = o.getDouble("latitude");
+                        double lon = o.getDouble("longitude");
+                        String owner = o.getString("owner");
+                        double score = o.getDouble("score");
+
+                        Polygon p = new Polygon(mapView);
+                        p.setPoints(hexagonAround(new GeoPoint(lat, lon), TERRITORY_RADIUS_M));
+                        p.setFillColor(colorForOwner(owner));
+                        p.setStrokeColor(0xFF000000);
+                        p.setStrokeWidth(2f);
+                        p.setTitle(owner);
+                        p.setSnippet("cobertura: " + score);
+                        p.setInfoWindow(new WifiInfoWindow(this, mapView));
+                        polys.add(p);
+                    }
+
+                    final List<Polygon> toAdd = polys;
+                    runOnUiThread(() -> {
+                        mapView.getOverlays().removeAll(territoryPolygons);
+                        territoryPolygons.clear();
+                        mapView.getOverlays().addAll(toAdd);
+                        territoryPolygons.addAll(toAdd);
+                        mapView.invalidate();
+                    });
+                } finally {
+                    conn.disconnect();
+                }
+            } catch (Exception e) {
+                android.util.Log.w("Territorios", "error: " + e.getMessage());
+            }
+        });
+    }
+
+    private static String readAll(InputStream is) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = is.read(buf)) != -1) {
+            out.write(buf, 0, n);
+        }
+        return out.toString(StandardCharsets.UTF_8.name());
+    }
+
+    private static List<GeoPoint> hexagonAround(GeoPoint center, double radiusM) {
+        double dLatPerM = 1.0 / 111320.0;
+        double dLonPerM = 1.0 / (111320.0 * Math.cos(Math.toRadians(center.getLatitude())));
+        List<GeoPoint> pts = new ArrayList<>(6);
+        for (int i = 0; i < 6; i++) {
+            double angle = Math.toRadians(i * 60.0);
+            double dx = radiusM * Math.cos(angle);
+            double dy = radiusM * Math.sin(angle);
+            pts.add(new GeoPoint(center.getLatitude() + dy * dLatPerM,
+                    center.getLongitude() + dx * dLonPerM));
+        }
+        return pts;
+    }
+
+    private static int colorForOwner(String name) {
+        int h = 0;
+        for (char c : String.valueOf(name).toCharArray()) {
+            h = (h * 31 + c) % 360;
+        }
+        return android.graphics.Color.HSVToColor(150, new float[]{h, 0.7f, 0.45f});
+    }
+
     // ---- WifiScanner.Listener ----
 
     @Override
@@ -484,21 +598,27 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         keyInput.setHint("API key");
         keyInput.setText(config.apiKey);
 
+        android.widget.EditText playerInput = new android.widget.EditText(this);
+        playerInput.setHint("Nombre de jugador");
+        playerInput.setText(config.playerName);
+
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
         layout.setPadding(pad, pad, pad, 0);
         layout.addView(urlInput);
         layout.addView(keyInput);
+        layout.addView(playerInput);
 
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("Servidor remoto")
-                .setMessage("Dónde subir los datos para verlos en el mapa web en tiempo real.")
+                .setMessage("Dónde subir los datos y tu nombre de jugador (para la conquista).")
                 .setView(layout)
                 .setPositiveButton("Guardar", (d, w) -> {
                     ServerConfig c = new ServerConfig();
                     c.serverUrl = urlInput.getText().toString().trim();
                     c.apiKey = keyInput.getText().toString().trim();
+                    c.playerName = playerInput.getText().toString().trim();
                     c.save(this);
                     android.widget.Toast.makeText(this, "Servidor guardado", Toast.LENGTH_SHORT).show();
                 })
@@ -590,6 +710,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
     @Override
     protected void onDestroy() {
+        uiHandler.removeCallbacksAndMessages(null);
         // No se detiene el escáner aquí: lo gobierna el ScanService en primer plano.
         if (!scanner.isRunning()) {
             scanner.stop();

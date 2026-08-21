@@ -70,6 +70,8 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 |---|---|---|---|
 | `POST` | `/api/measurements` | `x-api-key` | Ingresa mediciones (array o `{measurements:[...]}`). Emite broadcast por WS. |
 | `GET` | `/api/networks` | — | Redes agregadas (para la carga inicial de la web). |
+| `GET` | `/api/territories` | — | Hexágonos (H3) conquistados y su dueño (juego de conquista). |
+| `GET` | `/api/last-position` | — | Última posición medida (centrado inicial). |
 | `GET` | `/health` | — | Estado. |
 | `WS` | `/ws` | — | Emite `{type:"measurements", data:[...]}` en tiempo real. |
 
@@ -88,6 +90,9 @@ Abrir `http://localhost:8080` en el navegador. La página:
 - Carga las redes iniciales desde `/api/networks`.
 - Se conecta a `/ws` y pinta en vivo cada medición entrante (centroide ponderado por señal, coloreado por intensidad).
 - Muestra la **fecha de la última actualización** y el conteo de redes.
+
+## Juego de conquista
+La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su dueño. La posesión se calcula con **cobertura + decaimiento**: cada medición suma un peso que decae exponencialmente (~7 días); el dueño de un hexágono es el jugador con más cobertura acumulada. La identidad de cada jugador es su **nombre** (`x-device-name`).
 
 ## App Android
 La app sube cada barrido a `{serverUrl}/api/measurements`. Configurar la URL y la API key desde **Mapero → menú (⋮) → Servidor**. Para desarrollo en la misma red local, la URL del servidor es la IP LAN de la máquina (p. ej. `http://192.168.0.12:8080`).

@@ -11,8 +11,8 @@ export const pool = new Pool({
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS devices (
   id          SERIAL PRIMARY KEY,
-  api_key     TEXT UNIQUE NOT NULL,
-  name        TEXT,
+  api_key     TEXT NOT NULL,
+  name        TEXT UNIQUE NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS measurements (
 
 CREATE INDEX IF NOT EXISTS idx_measurements_ts ON measurements (ts);
 CREATE INDEX IF NOT EXISTS idx_measurements_ssid ON measurements (ssid);
+
+-- Identidad del juego: un jugador por nombre (para competir individualmente)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_name ON devices (name);
 `;
 
 export async function initDb() {

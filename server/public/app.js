@@ -34,6 +34,7 @@ function colorFor(rssi) {
 
 function ingest(bssid, ssid, lat, lon, rssi) {
   const name = (ssid && ssid.trim()) ? ssid : bssid;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(rssi)) return;
   let n = networks.get(name);
   if (!n) {
     n = { sumLat: 0, sumLon: 0, sumW: 0, sumRssi: 0, count: 0, marker: null };
@@ -50,8 +51,10 @@ function ingest(bssid, ssid, lat, lon, rssi) {
 function addNetwork(name) {
   const n = networks.get(name);
   if (!n) return;
-  const lat = n.sumLat / n.sumW;
-  const lon = n.sumLon / n.sumW;
+  // Si todas las muestras pesaron 0 (señal muy débil), cae al promedio simple.
+  const lat = n.sumW > 0 ? n.sumLat / n.sumW : n.sumLat / n.count;
+  const lon = n.sumW > 0 ? n.sumLon / n.sumW : n.sumLon / n.count;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
   const rssi = n.sumRssi / n.count;
 
   if (n.marker) {

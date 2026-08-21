@@ -7,7 +7,7 @@ const ROUNDS = 10;
 /** Crea un usuario y devuelve { token, username }. */
 export async function register(username, password) {
   const name = String(username).trim().slice(0, 30);
-  if (!name || !password || password.length < 4) {
+  if (!name || !password || password.length < 3) {
     const e = new Error('Usuario o contraseña inválidos');
     e.status = 400;
     throw e;

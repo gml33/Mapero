@@ -175,6 +175,12 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         scanning = scanner.isRunning();
         scanButton.setText(scanning ? R.string.stop : R.string.start);
         scanner.addListener(this);
+
+        // Si hay sesión y streaming activo, sube automáticamente lo pendiente.
+        ServerConfig sc = ServerConfig.load(this);
+        if (sc.streaming && sc.hasToken()) {
+            syncUploader.syncAll();
+        }
     }
 
     @Override
@@ -269,7 +275,14 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
         streamButton.setOnClickListener(v -> {
             ServerConfig config = ServerConfig.load(this);
-            config.streaming = !config.streaming;
+            boolean turningOn = !config.streaming;
+            if (turningOn && !config.hasToken()) {
+                // Sin sesión no se puede subir: pedir login directamente.
+                Toast.makeText(this, "Primero conectate al servidor", Toast.LENGTH_SHORT).show();
+                showServerDialog();
+                return;
+            }
+            config.streaming = turningOn;
             config.save(this);
             updateStreamButton();
             if (config.streaming) {

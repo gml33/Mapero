@@ -120,6 +120,12 @@ Tabla `measurements` — una fila por cada red detectada en cada barrido (con su
 
 ---
 
+## 🗺️ Roadmap
+
+Las funcionalidades planificadas (mapa web en tiempo real, API para compartir datos entre dispositivos, fecha de última actualización y juego de conquista de zonas) están detalladas en [`ROADMAP.md`](ROADMAP.md).
+
+---
+
 ## 🧭 Notas técnicas
 
 - **RSSI suavizado:** se aplica una media móvil exponencial (α=0.5) por BSSID y se descartan saltos >30 dBm para eliminar ruido.

@@ -13,7 +13,7 @@ captures/
 local.properties
 
 # Salidas
-app/build/
+android/app/build/
 
 # Servidor
 server/node_modules/

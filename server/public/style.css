@@ -1,9 +1,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #map { height: 100%; width: 100%; font-family: system-ui, sans-serif; }
+html, body { height: 100%; width: 100%; font-family: system-ui, sans-serif; }
 
 header {
-  position: fixed;
-  top: 0; left: 0; right: 0;
+  position: relative;
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -12,6 +11,11 @@ header {
   background: rgba(0, 105, 92, 0.95);
   color: #fff;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+#map {
+  height: calc(100vh - 54px);
+  width: 100%;
 }
 header h1 { font-size: 18px; font-weight: 700; }
 .status { font-size: 12px; padding: 3px 8px; border-radius: 12px; background: #444; }

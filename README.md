@@ -38,11 +38,27 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 
 ---
 
+## 📁 Estructura del proyecto
+
+```
+.
+├── android/        # App Android (Gradle + Java) — ver app/
+│   └── app/        #   módulo de la aplicación
+├── server/         # Backend (API + web en tiempo real) — Node.js
+├── docs/           # Documentación técnica
+├── README.md
+└── ROADMAP.md      # Funcionalidades futuras
+```
+
 ## 🚀 Compilar e instalar
+
+El proyecto está organizado en dos carpetas: **`android/`** (la app) y **`server/`** (el backend y la web). Los comandos de la app se ejecutan dentro de `android/`.
 
 Requisitos de entorno: **JDK 17**, **Android SDK 34** y **Gradle wrapper** incluido.
 
 ```bash
+cd android
+
 # Compilar APK de debug
 ./gradlew :app:assembleDebug
 
@@ -53,7 +69,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ./gradlew :app:installDebug
 ```
 
-> `local.properties` debe apuntar a tu SDK: `sdk.dir=/ruta/al/Android/sdk`. No se versiona.
+> `android/local.properties` debe apuntar a tu SDK: `sdk.dir=/ruta/al/Android/sdk`. No se versiona.
 
 ---
 

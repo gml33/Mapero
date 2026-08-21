@@ -95,6 +95,20 @@ app.get('/api/networks', async (_req, res) => {
   }
 });
 
+// ---- Última posición medida (para centrar el mapa inicial) ----
+app.get('/api/last-position', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT latitude, longitude FROM measurements
+       ORDER BY ts DESC LIMIT 1`);
+    if (rows.length === 0) return res.json(null);
+    res.json({ latitude: rows[0].latitude, longitude: rows[0].longitude });
+  } catch (e) {
+    console.error('[api] error last-position:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ---- WebSocket en tiempo real ----

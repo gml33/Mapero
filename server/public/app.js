@@ -1,8 +1,21 @@
 const MAP_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const MAP_ATTR = '&copy; OpenStreetMap contributors';
 
+// Vista por defecto mientras carga; se reemplaza con la última posición medida.
 const map = L.map('map').setView([-34.6118, -58.4173], 14);
 L.tileLayer(MAP_TILE, { attribution: MAP_ATTR, maxZoom: 19 }).addTo(map);
+
+async function centerOnLastPosition() {
+  try {
+    const res = await fetch('/api/last-position');
+    const pos = await res.json();
+    if (pos && Number.isFinite(pos.latitude) && Number.isFinite(pos.longitude)) {
+      map.setView([pos.latitude, pos.longitude], 15);
+    }
+  } catch (e) {
+    console.error('error centrando en última posición', e);
+  }
+}
 
 // Estado de las redes: name -> agregación (centroide ponderado por señal).
 const networks = new Map();
@@ -97,5 +110,6 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+centerOnLastPosition();
 loadInitial();
 connect();

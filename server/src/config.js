@@ -1,4 +1,5 @@
 import { pool } from './db.js';
+import { territoryOptions } from './territories.js';
 
 /** Lee todas las claves de configuración como un objeto simple. */
 export async function getSettings() {
@@ -27,10 +28,8 @@ export async function appConfig() {
       txPower: Number(s.calibration_tx) || -45,
       pathLossN: Number(s.calibration_n) || 2.0,
     },
-    territory: {
-      hexRes: Number(s.hex_res) || 10,
-      decayDays: Number(s.decay_days) || 7,
-      contestThreshold: Number(s.contest_threshold) || 0.6,
-    },
+    // Mismo acotado que usa la partida, para que lo que muestra el panel sea
+    // lo que realmente se aplica.
+    territory: territoryOptions(s),
   };
 }

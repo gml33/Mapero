@@ -1,9 +1,32 @@
-import { latLngToCell, cellToLatLng } from 'h3-js';
+import { latLngToCell, cellToLatLng, cellToBoundary } from 'h3-js';
 
 /** Resolución H3 → hexágonos de ~150 m. */
 export const HEX_RES = 10;
-/** Constante de decaimiento: la cobertura antigua pierde valor (~7 días). */
-const TAU_MS = 7 * 24 * 3600 * 1000;
+/** Decaimiento de la cobertura por defecto (~7 días). */
+export const DECAY_DAYS = 7;
+/** Umbral para marcar una celda "en disputa". */
+export const CONTEST_THRESHOLD = 0.6;
+
+/** Ajusta un número al rango permitido y lo devuelve, o `fallback` si no es válido. */
+function clampNumber(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Ajustes de la partida desde `settings`, ya validados y acotados.
+ * `hex_res` admite 0..15 (límite de H3); un hex_res distinto recalcula los
+ * donos de todas las celdas, así que la partida muestra un mapa nuevo.
+ */
+export function territoryOptions(settings = {}) {
+  return {
+    hexRes: Math.round(clampNumber(settings.hex_res, 0, 15, HEX_RES)),
+    decayDays: clampNumber(settings.decay_days, 0.1, 365, DECAY_DAYS),
+    contestThreshold: clampNumber(
+      settings.contest_threshold, 0, 1, CONTEST_THRESHOLD),
+  };
+}
 
 /**
  * Calcula el dueño de cada hexágono a partir de las mediciones.
@@ -12,14 +35,19 @@ const TAU_MS = 7 * 24 * 3600 * 1000;
  * peso acumulado (empates se resuelven por actividad más reciente).
  *
  * rows: [{ user_id, name, latitude, longitude, ts }]
+ * opts: { hexRes, decayDays, contestThreshold } — ver `territoryOptions`.
  */
-export function buildTerritories(rows, now = Date.now()) {
+export function buildTerritories(rows, opts = {}, now = Date.now()) {
+  const hexRes = opts.hexRes ?? HEX_RES;
+  const tauMs = (opts.decayDays ?? DECAY_DAYS) * 24 * 3600 * 1000;
+  const threshold = opts.contestThreshold ?? CONTEST_THRESHOLD;
+
   const score = new Map(); // `${hex}|${userId}` -> acc
 
   for (const r of rows) {
-    const hex = latLngToCell(r.latitude, r.longitude, HEX_RES);
+    const hex = latLngToCell(r.latitude, r.longitude, hexRes);
     const age = now - new Date(r.ts).getTime();
-    const w = Math.exp(-age / TAU_MS);
+    const w = Math.exp(-age / tauMs);
     const key = hex + '|' + r.user_id;
     const acc = score.get(key) || {
       hex, userId: r.user_id, name: r.name, score: 0, count: 0, lastTs: 0,
@@ -43,12 +71,17 @@ export function buildTerritories(rows, now = Date.now()) {
     const top = list[0];
     const second = list[1];
     const [lat, lon] = cellToLatLng(top.hex);
-    // "En disputa": el segundo tiene al menos 60% de la cobertura del dueño.
-    const contested = !!second && second.score >= 0.6 * top.score;
+    const boundary = cellToBoundary(top.hex, true).map(([lng, lat]) => ({
+      latitude: lat,
+      longitude: lng,
+    }));
+    // "En disputa": el segundo tiene al menos el umbral de la cobertura del dueño.
+    const contested = !!second && second.score >= threshold * top.score;
     return {
       hex: top.hex,
       latitude: lat,
       longitude: lon,
+      boundary,
       owner: top.name,
       score: Math.round(top.score * 100) / 100,
       secondScore: second ? Math.round(second.score * 100) / 100 : 0,

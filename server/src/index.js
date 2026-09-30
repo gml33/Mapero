@@ -6,9 +6,10 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool, initDb } from './db.js';
-import { buildTerritories } from './territories.js';
+import { buildTerritories, territoryOptions } from './territories.js';
 import { register, login, requireAuth, requireAdmin, createUser, setUserRole, setUserPassword } from './auth.js';
 import { getSettings, updateSettings, appConfig } from './config.js';
+import { rowFilters, networkFilters, aggregatedOpenSql, aggregatedBandSql, signalWeightSql } from './filters.js';
 
 dotenv.config();
 
@@ -48,6 +49,30 @@ app.post('/api/auth/login', async (req, res) => {
 const MAX_SPEED_MPS = 40;
 // Última posición conocida por usuario (para detectar teletransportes).
 const lastPos = new Map();
+
+// ---- Ajustes de la partida (cacheados para no leer `settings` en cada pedido) ----
+let territoryOpts = { at: 0, value: null };
+async function territorySettings() {
+  if (territoryOpts.value && Date.now() - territoryOpts.at < 10000) {
+    return territoryOpts.value;
+  }
+  const value = territoryOptions(await getSettings());
+  territoryOpts = { at: Date.now(), value };
+  return value;
+}
+function invalidateTerritorySettings() {
+  territoryOpts = { at: 0, value: null };
+}
+
+/** Filas de los últimos días que alimentan el juego de conquista. */
+async function territoryRows() {
+  const { rows } = await pool.query(
+    `SELECT m.user_id, u.username AS name, m.latitude, m.longitude, m.ts
+     FROM measurements m
+     JOIN users u ON u.id = m.user_id
+     WHERE m.ts > now() - interval '30 days'`);
+  return rows;
+}
 
 function haversineM(aLat, aLon, bLat, bLon) {
   const R = 6371000;
@@ -122,19 +147,48 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
 });
 
 // ---- Redes agregadas (carga inicial para la web) ----
-app.get('/api/networks', async (_req, res) => {
+app.get('/api/networks', async (req, res) => {
   try {
-    const key = `COALESCE(NULLIF(ssid, ''), bssid)`;
+    const key = `COALESCE(NULLIF(m.ssid, ''), m.bssid)`;
+    const cond = [];
+    const params = [];
+
+    if (req.query.user) {
+      params.push(req.query.user);
+      cond.push('u.username = $' + params.length);
+    }
+    if (req.query.q) {
+      params.push('%' + req.query.q + '%');
+      cond.push(`${key} ILIKE $` + params.length);
+    }
+    const filters = networkFilters(req.query, { alias: 'm', paramOffset: params.length });
+
+    const where = cond.length ? 'WHERE ' + cond.join(' AND ') : '';
+    const having = filters.having.length ? 'HAVING ' + filters.having.join(' AND ') : '';
+    params.push(...filters.params);
+
+    // Centroide ponderado por señal. Si todas las muestras pesan 0 (señal muy
+    // débil) cae al promedio simple, para no dividir por cero ni devolver NaN.
+    const w = signalWeightSql('m');
+    const centroid = (col) => `CASE WHEN SUM(${w}) > 0
+        THEN SUM(${col} * ${w}) / SUM(${w}) ELSE AVG(${col}) END::double precision`;
+
     const { rows } = await pool.query(
       `SELECT ${key} AS name,
-              AVG(latitude)  AS latitude,
-              AVG(longitude) AS longitude,
-              AVG(rssi)      AS rssi,
-              COUNT(*)       AS samples,
-              MAX(ts)        AS last_seen
-       FROM measurements
+              ${centroid('m.latitude')}  AS latitude,
+              ${centroid('m.longitude')} AS longitude,
+              AVG(m.rssi)::double precision      AS rssi,
+              COUNT(*)::int         AS samples,
+              MAX(m.ts)             AS last_seen,
+              (${aggregatedOpenSql('m')})::boolean AS open,
+              ${aggregatedBandSql('m')} AS band,
+              array_agg(DISTINCT u.username) AS users
+       FROM measurements m
+       JOIN users u ON u.id = m.user_id
+       ${where}
        GROUP BY ${key}
-       ORDER BY last_seen DESC`);
+       ${having}
+       ORDER BY last_seen DESC`, params);
     res.json(rows);
   } catch (e) {
     console.error('[api] error networks:', e);
@@ -142,15 +196,22 @@ app.get('/api/networks', async (_req, res) => {
   }
 });
 
+// ---- Usuarios para el filtro del mapa web ----
+app.get('/api/users', async (_req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT username FROM users ORDER BY username');
+    res.json(rows);
+  } catch (e) {
+    console.error('[api] error users:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // ---- Territorios del juego de conquista ----
 app.get('/api/territories', async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT m.user_id, u.username AS name, m.latitude, m.longitude, m.ts
-       FROM measurements m
-       JOIN users u ON u.id = m.user_id
-       WHERE m.ts > now() - interval '30 days'`);
-    const territories = buildTerritories(rows);
+    const territories = buildTerritories(
+      await territoryRows(), await territorySettings());
     res.json(territories);
   } catch (e) {
     console.error('[api] error territories:', e);
@@ -162,11 +223,8 @@ app.get('/api/territories', async (_req, res) => {
 app.get('/api/leaderboard', async (_req, res) => {
   try {
     // Se calcula con el mismo modelo de territorios para no duplicar lógica.
-    const terr = await pool.query(
-      `SELECT m.user_id, u.username AS name, m.latitude, m.longitude, m.ts
-       FROM measurements m JOIN users u ON u.id = m.user_id
-       WHERE m.ts > now() - interval '30 days'`);
-    const territories = buildTerritories(terr.rows);
+    const territories = buildTerritories(
+      await territoryRows(), await territorySettings());
 
     const perUser = new Map();
     for (const t of territories) {
@@ -218,8 +276,28 @@ app.put('/api/config', requireAdmin, async (req, res) => {
     for (const k of allowed) {
       if (req.body && req.body[k] !== undefined) patch[k] = req.body[k];
     }
+
+    // Acota los valores antes de guardarlos para que el panel y la partida
+    // nunca discrepen. Solo se tocan las claves presentes en el parche: si no,
+    // guardar el intervalo de escaneo reiniciaría la resolución de la partida.
+    const clamped = territoryOptions(patch);
+    const bounds = [
+      ['hex_res', clamped.hexRes],
+      ['decay_days', clamped.decayDays],
+      ['contest_threshold', clamped.contestThreshold],
+    ];
+    for (const [key, value] of bounds) {
+      if (key in patch) patch[key] = value;
+    }
+    if ('scan_interval_ms' in patch) {
+      const ms = Number(patch.scan_interval_ms);
+      patch.scan_interval_ms = Number.isFinite(ms)
+        ? Math.min(60000, Math.max(1000, Math.round(ms))) : 6000;
+    }
+
     if (Object.keys(patch).length) {
       await updateSettings(patch);
+      invalidateTerritorySettings();
     }
     res.json(await appConfig());
   } catch (e) {
@@ -234,11 +312,8 @@ app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
   try {
     const users = await pool.query('SELECT COUNT(*)::int n FROM users');
     const meas = await pool.query('SELECT COUNT(*)::int n FROM measurements');
-    const terr = await pool.query(
-      `SELECT m.user_id, u.username AS name, m.latitude, m.longitude, m.ts
-       FROM measurements m JOIN users u ON u.id = m.user_id
-       WHERE m.ts > now() - interval '30 days'`);
-    const territories = buildTerritories(terr.rows);
+    const territories = buildTerritories(
+      await territoryRows(), await territorySettings());
     res.json({
       users: users.rows[0].n,
       measurements: meas.rows[0].n,
@@ -316,25 +391,10 @@ app.get('/api/admin/measurements', requireAdmin, async (req, res) => {
     if (req.query.mac) { params.push('%' + req.query.mac + '%'); cond.push('m.bssid ILIKE $' + params.length); }
 
     // Filtros combinados: tipo de seguridad, banda y señal mínima.
-    if (req.query.type === 'open') {
-      cond.push(`(m.capabilities IS NULL OR m.capabilities = ''
-                 OR (m.capabilities NOT ILIKE '%WPA%' AND m.capabilities NOT ILIKE '%WEP%'
-                     AND m.capabilities NOT ILIKE '%RSN%' AND m.capabilities NOT ILIKE '%SAE%'
-                     AND m.capabilities NOT ILIKE '%PSK%'))`);
-    } else if (req.query.type === 'protected') {
-      cond.push(`(m.capabilities ILIKE '%WPA%' OR m.capabilities ILIKE '%WEP%'
-                  OR m.capabilities ILIKE '%RSN%' OR m.capabilities ILIKE '%SAE%'
-                  OR m.capabilities ILIKE '%PSK%')`);
-    }
-    if (req.query.band === '2.4') {
-      cond.push('m.frequency > 0 AND m.frequency < 3000');
-    } else if (req.query.band === '5') {
-      cond.push('m.frequency >= 3000');
-    }
-    if (req.query.sig) {
-      params.push(Number(req.query.sig));
-      cond.push('m.rssi >= $' + params.length);
-    }
+    // Acá se listan mediciones individuales, así que los filtros van por fila.
+    const filters = rowFilters(req.query, { alias: 'm', paramOffset: params.length });
+    cond.push(...filters.where);
+    params.push(...filters.params);
 
     const where = cond.length ? ' WHERE ' + cond.join(' AND ') : '';
 

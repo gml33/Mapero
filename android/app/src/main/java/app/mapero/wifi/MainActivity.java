@@ -70,6 +70,11 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
     private static final String TAG = "MainActivity";
     private static final int REQ_PERMISSIONS = 100;
+    private static final String EXTRA_SERVER_URL = "server_url";
+    private static final String EXTRA_SERVER_USER = "server_user";
+    private static final String EXTRA_SERVER_PASS = "server_pass";
+    private static final String EXTRA_AUTO_CONNECT = "auto_connect";
+    private static final String EXTRA_STREAMING = "streaming";
 
     private MapView mapView;
     private TextView statusText;
@@ -101,6 +106,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     private int filterType = 0;
     private int filterBand = 0;
     private int filterMinSignal = -200;
+    private final java.util.Set<String> hiddenNetworkNames = new java.util.HashSet<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -161,6 +167,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
         uiHandler.post(territoryLoop);
         applyServerConfig();
+        applyDevIntentConfig(getIntent());
 
         // Observa las mediciones, las agrega por trilateración y pinta los puntos
         Observer<List<WifiMeasurement>> observer = data -> {
@@ -168,6 +175,13 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
             refreshMap();
         };
         database.wifiDao().observeAll().observe(this, observer);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        applyDevIntentConfig(intent);
     }
 
     @Override
@@ -363,6 +377,45 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         }
     }
 
+    private void applyDevIntentConfig(Intent intent) {
+        if (intent == null) return;
+        Bundle extras = intent.getExtras();
+        if (extras == null) return;
+
+        String url = trimToEmpty(extras.getString(EXTRA_SERVER_URL));
+        String user = trimToEmpty(extras.getString(EXTRA_SERVER_USER));
+        String pass = trimToEmpty(extras.getString(EXTRA_SERVER_PASS));
+        boolean hasStreaming = extras.containsKey(EXTRA_STREAMING);
+        boolean autoConnect = extras.getBoolean(EXTRA_AUTO_CONNECT, false);
+
+        if (url.isEmpty() && user.isEmpty() && pass.isEmpty() && !hasStreaming && !autoConnect) {
+            return;
+        }
+
+        ServerConfig config = ServerConfig.load(this);
+        if (!url.isEmpty()) config.serverUrl = url;
+        if (!user.isEmpty()) config.username = user;
+        if (!pass.isEmpty()) config.password = pass;
+        if (hasStreaming) config.streaming = extras.getBoolean(EXTRA_STREAMING, config.streaming);
+        config.save(this);
+        updateStreamButton();
+
+        if (autoConnect) {
+            if (config.serverUrl == null || config.serverUrl.trim().isEmpty()
+                    || config.username == null || config.username.trim().isEmpty()
+                    || config.password == null || config.password.isEmpty()) {
+                Toast.makeText(this,
+                        "Faltan datos para conectar al servidor", Toast.LENGTH_LONG).show();
+                return;
+            }
+            connect(config.serverUrl.trim(), config.username.trim(), config.password);
+        }
+    }
+
+    private String trimToEmpty(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     // ---- Configuración remota (desde el panel admin) ----
 
     private void applyServerConfig() {
@@ -431,7 +484,12 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
                         double score = o.getDouble("score");
 
                         Polygon p = new Polygon(mapView);
-                        p.setPoints(hexagonAround(new GeoPoint(lat, lon), TERRITORY_RADIUS_M));
+                        JSONArray boundary = o.optJSONArray("boundary");
+                        if (boundary != null && boundary.length() >= 6) {
+                            p.setPoints(parseBoundary(boundary));
+                        } else {
+                            p.setPoints(hexagonAround(new GeoPoint(lat, lon), TERRITORY_RADIUS_M));
+                        }
                         p.setFillColor(colorForOwner(owner));
                         p.setStrokeColor(0xFF000000);
                         p.setStrokeWidth(2f);
@@ -445,7 +503,9 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
                     runOnUiThread(() -> {
                         mapView.getOverlays().removeAll(territoryPolygons);
                         territoryPolygons.clear();
-                        mapView.getOverlays().addAll(toAdd);
+                        // Los territorios deben quedar por debajo de las redes WiFi para no
+                        // capturar el toque cuando el usuario quiere abrir una red.
+                        mapView.getOverlays().addAll(0, toAdd);
                         territoryPolygons.addAll(toAdd);
                         mapView.invalidate();
                     });
@@ -478,6 +538,15 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
             double dy = radiusM * Math.sin(angle);
             pts.add(new GeoPoint(center.getLatitude() + dy * dLatPerM,
                     center.getLongitude() + dx * dLonPerM));
+        }
+        return pts;
+    }
+
+    private static List<GeoPoint> parseBoundary(JSONArray boundary) throws Exception {
+        List<GeoPoint> pts = new ArrayList<>(boundary.length());
+        for (int i = 0; i < boundary.length(); i++) {
+            JSONObject p = boundary.getJSONObject(i);
+            pts.add(new GeoPoint(p.getDouble("latitude"), p.getDouble("longitude")));
         }
         return pts;
     }
@@ -553,6 +622,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         if (filterBand == 1 && ap.band != 1) return false;
         if (filterBand == 2 && ap.band != 2) return false;
         if (ap.avgRssi < filterMinSignal) return false;
+        if (hiddenNetworkNames.contains(normalizeNetworkName(nameFor(ap)))) return false;
         return true;
     }
 
@@ -712,6 +782,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         android.widget.Spinner type = new android.widget.Spinner(this);
         android.widget.Spinner band = new android.widget.Spinner(this);
         android.widget.Spinner signal = new android.widget.Spinner(this);
+        android.widget.EditText hiddenNames = new android.widget.EditText(this);
 
         android.widget.ArrayAdapter<CharSequence> ta =
                 android.widget.ArrayAdapter.createFromResource(this,
@@ -731,6 +802,10 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         int sigIdx = filterMinSignal == -200 ? 0
                 : (filterMinSignal == -80 ? 1 : (filterMinSignal == -70 ? 2 : 3));
         signal.setSelection(sigIdx);
+        hiddenNames.setHint("SSID a ocultar, separados por coma o línea");
+        hiddenNames.setMinLines(2);
+        hiddenNames.setMaxLines(4);
+        hiddenNames.setText(formatHiddenNames());
 
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -742,6 +817,8 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         layout.addView(band);
         layout.addView(label("Señal mínima"));
         layout.addView(signal);
+        layout.addView(label("Ocultar redes por nombre"));
+        layout.addView(hiddenNames);
 
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("Filtros de red")
@@ -751,10 +828,32 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
                     filterBand = band.getSelectedItemPosition();
                     int[] sigVals = {-200, -80, -70, -60};
                     filterMinSignal = sigVals[signal.getSelectedItemPosition()];
+                    hiddenNetworkNames.clear();
+                    hiddenNetworkNames.addAll(parseHiddenNames(
+                            hiddenNames.getText().toString()));
                     applyZoomFilter();
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
+    }
+
+    private String formatHiddenNames() {
+        java.util.List<String> names = new java.util.ArrayList<>(hiddenNetworkNames);
+        java.util.Collections.sort(names);
+        return String.join(", ", names);
+    }
+
+    private java.util.Set<String> parseHiddenNames(String raw) {
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (String part : raw.split("[,\\n]")) {
+            String normalized = normalizeNetworkName(part);
+            if (!normalized.isEmpty()) names.add(normalized);
+        }
+        return names;
+    }
+
+    private String normalizeNetworkName(String name) {
+        return name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
     }
 
     private android.widget.TextView label(String text) {

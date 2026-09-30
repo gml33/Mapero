@@ -32,8 +32,9 @@ public class WifiMeasurement {
     @ColumnInfo(name = "frequency")
     public int frequency;
 
-    @ColumnInfo(name = "capabilities")
-    public String capabilities;
+    @NonNull
+    @ColumnInfo(name = "capabilities", defaultValue = "''")
+    public String capabilities = "";
 
     @ColumnInfo(name = "timestamp")
     public long timestamp;

@@ -7,7 +7,7 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 - Un sitio web las visualiza en vivo sobre un mapa (Leaflet + OpenStreetMap), con colores por intensidad.
 - Actualización en tiempo real por WebSocket.
 - Muestra la **fecha de la última actualización** y el conteo de redes.
-- Pendientes: autenticación, streaming más fino, filtros en la web.
+- Pendientes: autenticación, streaming más fino.
 
 ### Consideraciones
 - Modelo de datos a sincronizar: mismos campos que `measurements` + identificador de dispositivo/usuario.

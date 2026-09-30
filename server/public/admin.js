@@ -55,17 +55,31 @@ document.querySelectorAll('nav button').forEach((b) => {
   };
 });
 
-function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
+// Tri-estado: las mediciones sin `capabilities` no se pueden clasificar.
 function isOpen(caps) {
   caps = String(caps || '');
-  if (!caps) return true;
+  if (!caps) return null;
   return !/WPA|WEP|RSN|SAE|PSK/.test(caps);
+}
+function securityLabel(caps) {
+  const open = isOpen(caps);
+  return open === null ? 'Sin datos' : open ? 'Abierta' : 'Protegida';
 }
 function bandLabel(freq) {
   freq = Number(freq);
   if (!freq) return '—';
-  return freq < 3000 ? '2,4 GHz' : '5 GHz';
+  if (freq < 3000) return '2,4 GHz';
+  if (freq < 5925) return '5 GHz';
+  return '6 GHz';
 }
 
 // ---- Render ----
@@ -202,12 +216,14 @@ async function renderMeasurements(d) {
             <option value="">Todos</option>
             <option value="open" ${meas.filters.type === 'open' ? 'selected' : ''}>Abiertas</option>
             <option value="protected" ${meas.filters.type === 'protected' ? 'selected' : ''}>Protegidas</option>
+            <option value="unknown" ${meas.filters.type === 'unknown' ? 'selected' : ''}>Sin datos</option>
           </select></field>
         <field><label>Banda</label>
           <select id="f_band">
             <option value="">Todas</option>
             <option value="2.4" ${meas.filters.band === '2.4' ? 'selected' : ''}>2,4 GHz</option>
             <option value="5" ${meas.filters.band === '5' ? 'selected' : ''}>5 GHz</option>
+            <option value="6" ${meas.filters.band === '6' ? 'selected' : ''}>6 GHz</option>
           </select></field>
         <field><label>Señal mínima</label>
           <select id="f_sig">
@@ -241,7 +257,7 @@ async function renderMeasurements(d) {
         ${d.rows.map((m) => `<tr>
           <td>${esc(m.username)}</td><td>${esc(m.ssid)}</td><td>${esc(m.bssid)}</td>
           <td>${m.rssi}</td>
-          <td>${isOpen(m.capabilities) ? 'Abierta' : 'Protegida'}</td>
+          <td>${securityLabel(m.capabilities)}</td>
           <td>${bandLabel(m.frequency)}</td>
           <td>${m.latitude.toFixed(4)}, ${m.longitude.toFixed(4)}</td>
           <td>${new Date(m.ts).toLocaleString()}</td>
@@ -312,15 +328,17 @@ async function renderConfig() {
   const s = await api('/api/admin/settings');
   $('view-config').innerHTML = `<div class="card"><h2>Configuración</h2>
     <form id="cfgForm">
-      <field><label>Intervalo de escaneo (ms)</label><input id="scan_interval_ms" type="number"></field>
+      <field><label>Intervalo de escaneo (ms)</label><input id="scan_interval_ms" type="number" min="1000" max="60000"></field>
       <field><label>Calibración · señal a 1 m (dBm)</label><input id="calibration_tx" type="number" step="1"></field>
       <field><label>Calibración · exponente n</label><input id="calibration_n" type="number" step="0.1"></field>
-      <field><label>Resolución hexágonos (H3)</label><input id="hex_res" type="number"></field>
-      <field><label>Decaimiento (días)</label><input id="decay_days" type="number" step="0.5"></field>
-      <field><label>Umbral de disputa</label><input id="contest_threshold" type="number" step="0.05"></field>
+      <field><label>Resolución hexágonos (H3)</label><input id="hex_res" type="number" min="0" max="15" step="1">
+        <small>0 = celdas enormes · 15 = muy chicas. Cambiarlo recalcula los donos de toda la partida.</small></field>
+      <field><label>Decaimiento (días)</label><input id="decay_days" type="number" step="0.5" min="0.1" max="365"></field>
+      <field><label>Umbral de disputa</label><input id="contest_threshold" type="number" step="0.05" min="0" max="1"></field>
       <field class="full"><button type="submit">Guardar</button></field>
     </form>
-    <p class="tip">La app Android descarga estos valores al abrirse y los aplica.</p>
+    <p class="tip">La app Android descarga el intervalo de escaneo y la calibración al abrirse y los aplica.
+      Los tres valores de partida (resolución, decaimiento y umbral) solo los usa el servidor.</p>
   </div>`;
   for (const k of Object.keys(s)) $(k).value = s[k];
   $('cfgForm').onsubmit = async (e) => {

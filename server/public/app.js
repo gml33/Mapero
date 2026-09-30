@@ -17,8 +17,13 @@ async function centerOnLastPosition() {
   }
 }
 
-// Estado de las redes: name -> agregación (centroide ponderado por señal).
-const networks = new Map();
+// Estado de las redes y filtros.
+let networkList = [];
+let netLayer = L.layerGroup().addTo(map);
+let netMarkers = new Map(); // name -> marker
+const filters = { type: '', band: '', sig: '', user: '', q: '', showNetworks: true };
+let loadTimer = null;
+const filterIds = ['fShowNetworks', 'fType', 'fBand', 'fSig', 'fUser', 'fQ'];
 
 function setStatus(text, online) {
   const el = document.getElementById('status');
@@ -32,63 +37,188 @@ function colorFor(rssi) {
   return '#c62828';
 }
 
-function ingest(bssid, ssid, lat, lon, rssi) {
-  const name = (ssid && ssid.trim()) ? ssid : bssid;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(rssi)) return;
-  let n = networks.get(name);
-  if (!n) {
-    n = { sumLat: 0, sumLon: 0, sumW: 0, sumRssi: 0, count: 0, marker: null };
-    networks.set(name, n);
-  }
-  const w = Math.max(0, rssi + 90);
-  n.sumLat += lat * w;
-  n.sumLon += lon * w;
-  n.sumW += w;
-  n.sumRssi += rssi;
-  n.count++;
+function bandLabel(band) {
+  if (band === '2.4') return '2,4 GHz';
+  if (band === '5') return '5 GHz';
+  if (band === '6') return '6 GHz';
+  return '—';
 }
 
-function addNetwork(name) {
-  const n = networks.get(name);
-  if (!n) return;
-  // Si todas las muestras pesaron 0 (señal muy débil), cae al promedio simple.
-  const lat = n.sumW > 0 ? n.sumLat / n.sumW : n.sumLat / n.count;
-  const lon = n.sumW > 0 ? n.sumLon / n.sumW : n.sumLon / n.count;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-  const rssi = n.sumRssi / n.count;
-
-  if (n.marker) {
-    n.marker.setLatLng([lat, lon]).setStyle({ color: colorFor(rssi) });
-    n.marker.bindPopup(`<b>${esc(name)}</b><br>Señal: ${rssi.toFixed(0)} dBm · ${n.count} muestras`);
-  } else {
-    n.marker = L.circleMarker([lat, lon], {
-      radius: 8, color: colorFor(rssi), weight: 2, fillOpacity: 0.8,
-    }).addTo(map).bindPopup(`<b>${esc(name)}</b><br>Señal: ${rssi.toFixed(0)} dBm · ${n.count} muestras`);
-  }
+// La seguridad es tri-estado: null significa que las mediciones no traen
+// capabilities (datos anteriores a esa columna), no que la red sea abierta.
+function securityLabel(open) {
+  if (open === true) return 'Abierta';
+  if (open === false) return 'Protegida';
+  return 'Sin datos';
 }
 
-function refreshAll() {
-  for (const name of networks.keys()) addNetwork(name);
-  document.getElementById('count').textContent = networks.size + ' redes';
+function matchesFilters(n) {
+  if (!filters.showNetworks) return false;
+  if (filters.type === 'open' && n.open !== true) return false;
+  if (filters.type === 'protected' && n.open !== false) return false;
+  if (filters.type === 'unknown' && n.open !== null) return false;
+  if (filters.band && n.band !== filters.band) return false;
+  if (filters.sig && Number(n.rssi) < Number(filters.sig)) return false;
+  if (filters.user && !(n.users || []).includes(filters.user)) return false;
+  if (filters.q && !String(n.name || '').toLowerCase().includes(filters.q.toLowerCase())) return false;
+  return true;
+}
+
+function popupHtml(n) {
+  return `<b>${esc(n.name)}</b><br>Señal: ${Number(n.rssi).toFixed(0)} dBm · ${n.samples} muestras`
+    + `<br>Tipo: ${securityLabel(n.open)} · ${bandLabel(n.band)}`
+    + (n.users && n.users.length ? `<br>Usuarios: ${n.users.map(esc).join(', ')}` : '');
+}
+
+function paramsFromFilters() {
+  const params = new URLSearchParams();
+  if (!filters.showNetworks) params.set('show', '0');
+  if (filters.type) params.set('type', filters.type);
+  if (filters.band) params.set('band', filters.band);
+  if (filters.sig) params.set('sig', filters.sig);
+  if (filters.user) params.set('user', filters.user);
+  if (filters.q) params.set('q', filters.q);
+  return params;
+}
+
+function syncUrl() {
+  const params = paramsFromFilters();
+  const next = params.toString();
+  const target = next ? `${location.pathname}?${next}` : location.pathname;
+  history.replaceState(null, '', target);
+}
+
+function applyFiltersFromUi() {
+  filters.showNetworks = document.getElementById('fShowNetworks').checked;
+  filters.type = document.getElementById('fType').value;
+  filters.band = document.getElementById('fBand').value;
+  filters.sig = document.getElementById('fSig').value;
+  filters.user = document.getElementById('fUser').value;
+  filters.q = document.getElementById('fQ').value.trim();
+  syncUrl();
+}
+
+function hydrateFiltersFromUrl() {
+  const params = new URLSearchParams(location.search);
+  filters.showNetworks = params.get('show') !== '0';
+  filters.type = params.get('type') || '';
+  filters.band = params.get('band') || '';
+  filters.sig = params.get('sig') || '';
+  filters.user = params.get('user') || '';
+  filters.q = params.get('q') || '';
+  document.getElementById('fShowNetworks').checked = filters.showNetworks;
+  document.getElementById('fType').value = filters.type;
+  document.getElementById('fBand').value = filters.band;
+  document.getElementById('fSig').value = filters.sig;
+  document.getElementById('fUser').value = filters.user;
+  document.getElementById('fQ').value = filters.q;
+}
+
+function renderNetworks() {
+  if (!filters.showNetworks) {
+    for (const [, marker] of netMarkers) {
+      if (netLayer.hasLayer(marker)) netLayer.removeLayer(marker);
+    }
+    document.getElementById('count').textContent = 'redes ocultas';
+    document.getElementById('lastUpdate').textContent =
+      'última actualización: ' + new Date().toLocaleTimeString();
+    return;
+  }
+  for (const [name, m] of netMarkers) {
+    if (!networkList.find((n) => n.name === name)) {
+      netLayer.removeLayer(m);
+      netMarkers.delete(name);
+    }
+  }
+  for (const n of networkList) {
+    const lat = Number(n.latitude), lon = Number(n.longitude);
+    const rssi = Number(n.rssi);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    let m = netMarkers.get(n.name);
+    if (!m) {
+      m = L.circleMarker([lat, lon], { radius: 8, weight: 2, fillOpacity: 0.8 });
+      m.bindPopup(popupHtml(n));
+      netMarkers.set(n.name, m);
+    } else {
+      m.setLatLng([lat, lon]);
+      m.bindPopup(popupHtml(n));
+    }
+    m.setStyle({ color: colorFor(rssi) });
+    const show = matchesFilters(n);
+    if (show && !netLayer.hasLayer(m)) netLayer.addLayer(m);
+    if (!show && netLayer.hasLayer(m)) netLayer.removeLayer(m);
+  }
+  const visible = networkList.filter(matchesFilters).length;
+  document.getElementById('count').textContent = visible + ' redes';
   document.getElementById('lastUpdate').textContent =
     'última actualización: ' + new Date().toLocaleTimeString();
 }
 
-// Carga / refresco de redes (limpiando antes para no duplicar)
 async function loadNetworks() {
   try {
-    const res = await fetch('/api/networks');
-    const rows = await res.json();
-    networks.forEach((n) => { if (n.marker) map.removeLayer(n.marker); });
-    networks.clear();
-    for (const r of rows) {
-      ingest(r.name, r.name, Number(r.latitude), Number(r.longitude), Number(r.rssi));
-    }
-    refreshAll();
+    const query = paramsFromFilters().toString();
+    const res = await fetch(query ? `/api/networks?${query}` : '/api/networks');
+    networkList = await res.json();
+    renderNetworks();
   } catch (e) {
     console.error('error carga de redes', e);
   }
 }
+
+// La lista de usuarios sale del servidor y no de la respuesta filtrada: si se
+// derivara de `networkList`, al elegir un usuario el selector se quedaría solo
+// con ese usuario y no se podría cambiar a otro sin volver a "Todos".
+async function loadUserOptions() {
+  const sel = document.getElementById('fUser');
+  if (sel.dataset.ready === '1') return;
+  try {
+    const users = await (await fetch('/api/users')).json();
+    sel.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = '';
+    all.textContent = 'Todos';
+    sel.appendChild(all);
+    for (const user of users) {
+      const opt = document.createElement('option');
+      opt.value = user.username;
+      opt.textContent = user.username;
+      sel.appendChild(opt);
+    }
+    sel.dataset.ready = '1';
+    if (filters.user) sel.value = filters.user;
+  } catch (e) {
+    console.error('error carga de usuarios', e);
+  }
+}
+
+function scheduleNetworkReload(delay = 250) {
+  clearTimeout(loadTimer);
+  loadTimer = setTimeout(loadNetworks, delay);
+}
+
+filterIds.forEach((id) => {
+  document.getElementById(id).addEventListener(id === 'fQ' ? 'input' : 'change', () => {
+    applyFiltersFromUi();
+    if (id === 'fShowNetworks' && !filters.showNetworks) {
+      renderNetworks();
+      return;
+    }
+    scheduleNetworkReload(id === 'fQ' ? 250 : 0);
+  });
+});
+
+document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+  for (const key of Object.keys(filters)) filters[key] = '';
+  filters.showNetworks = true;
+  document.getElementById('fShowNetworks').checked = true;
+  document.getElementById('fType').value = '';
+  document.getElementById('fBand').value = '';
+  document.getElementById('fSig').value = '';
+  document.getElementById('fUser').value = '';
+  document.getElementById('fQ').value = '';
+  syncUrl();
+  scheduleNetworkReload(0);
+});
 
 // WebSocket en tiempo real
 let ws;
@@ -102,16 +232,21 @@ function connect() {
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === 'measurements') {
-      for (const m of msg.data) {
-        ingest(m.bssid, m.ssid, Number(m.latitude), Number(m.longitude), Number(m.rssi));
-      }
-      refreshAll();
+      // Reconciliación: el WS avisa que hubo ingesta, el estado real se pide
+      // por HTTP (agregado por red, territories y leaderboard).
+      scheduleNetworkReload(800);
+      scheduleRefresh();
     }
   };
 }
 
 function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ---- Juego de conquista (territorios) ----
@@ -222,6 +357,8 @@ function scheduleRefresh() {
   }, 800);
 }
 
+hydrateFiltersFromUrl();
+loadUserOptions();
 centerOnLastPosition();
 loadNetworks();
 loadTerritories();

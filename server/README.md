@@ -76,7 +76,8 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 | `POST` | `/api/auth/register` | — | Crea usuario (`{username, password}`) → `{token, username}`. |
 | `POST` | `/api/auth/login` | — | Inicia sesión → `{token, username}`. |
 | `POST` | `/api/measurements` | `Bearer` | Ingresa mediciones del usuario autenticado. Emite broadcast por WS. |
-| `GET` | `/api/networks` | — | Redes agregadas (carga inicial de la web). |
+| `GET` | `/api/networks` | — | Redes agregadas (carga inicial de la web). Admite filtros, ver abajo. |
+| `GET` | `/api/users` | — | Lista de usuarios para el filtro del mapa. |
 | `GET` | `/api/territories` | — | Hexágonos (H3) conquistados y su dueño. |
 | `GET` | `/api/leaderboard` | — | Ranking de conquistas por jugador. |
 | `GET` | `/api/config` | — | Configuración que descargan las apps (intervalo, calibración, territorio). |
@@ -99,10 +100,35 @@ curl -X POST http://localhost:8080/api/measurements \
       ]}'
 ```
 
+## Filtros de red
+
+`/api/networks` y `/api/admin/measurements` comparten los mismos parámetros
+(`server/src/filters.js`):
+
+| Parámetro | Valores | Efecto |
+|---|---|---|
+| `type` | `open` · `protected` · `unknown` | Seguridad de la red. |
+| `band` | `2.4` · `5` · `6` | Banda (6 GHz = WiFi 6E). |
+| `sig` | número | Señal mínima en dBm (ej. `-70`). |
+| `user` | nombre de usuario | Solo redes medidas por ese usuario (en `/api/networks`, el de las mediciones de esa red). |
+| `q` | texto | Coincidencia parcial del nombre de la red. |
+
+`type=unknown` existe porque las mediciones anteriores a la columna
+`capabilities` no se pueden clasificar: no son redes abiertas, son redes sin
+datos de seguridad. Lo mismo pasa con `band` cuando la frecuencia es 0.
+
+`/api/networks` agrega primero y filtra después (los filtros de `type`, `band`
+y `sig` van en `HAVING`), así que los valores devueltos describen la red
+completa. `/api/admin/measurements` lista mediciones individuales, ahí los
+m filtros van por fila.
+
+Un valor no reconocido se ignora en lugar de romper la consulta.
+
 ## Web en tiempo real
 Abrir `http://localhost:8080` en el navegador. La página:
 - Carga las redes iniciales desde `/api/networks`.
-- Se conecta a `/ws` y pinta en vivo cada medición entrante (centroide ponderado por señal, coloreado por intensidad).
+- Permite compartir filtros en la URL (`type`, `band`, `sig`, `user`, `q`) y los aplica también del lado servidor.
+- Se conecta a `/ws` y, ante cada ingesta, reconcilia por HTTP las redes, los territorios y el leaderboard.
 - Muestra la **fecha de la última actualización** y el conteo de redes.
 
 ## Autenticación
@@ -113,7 +139,9 @@ La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su
 
 **Anti-cheat:** la ingesta rechaza mediciones con velocidad imposible (>40 m/s ≈ 144 km/h) entre lecturas del mismo usuario (detecta teletransportes).
 
-**Defensa:** `GET /api/territories` devuelve también el **segundo** mejor score por celda y marca `contested` cuando supera el 60% del dueño — la web lo pinta con borde punteado como celda "en disputa".
+**Defensa:** `GET /api/territories` devuelve también el **segundo** mejor score por celda y marca `contested` cuando supera el umbral `contest_threshold` (60% por defecto) del dueño — la web lo pinta con borde punteado como celda "en disputa".
+
+**Configuración de la partida:** la resolución del hexágono (`hex_res`, 0–15), el decaimiento (`decay_days`) y el umbral de disputa (`contest_threshold`) se editan en el panel admin y **sí se aplican**: se leen de `settings` con validación de rango, y un cambio recalcula los donos. La app Android solo consume el intervalo de escaneo y la calibración.
 
 ## App Android
 La app sube cada barrido a `{serverUrl}/api/measurements`. Configurar la URL y la API key desde **Mapero → menú (⋮) → Servidor**. Para desarrollo en la misma red local, la URL del servidor es la IP LAN de la máquina (p. ej. `http://192.168.0.12:8080`).

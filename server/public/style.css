@@ -28,6 +28,57 @@ header h1 { font-size: 18px; font-weight: 700; }
 }
 .last { margin-left: auto; font-size: 12px; opacity: 0.9; }
 
+#filters {
+  position: fixed;
+  top: 108px; left: 12px;
+  z-index: 1000;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 150px;
+  max-width: min(280px, calc(100vw - 24px));
+}
+#filters .filters-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+#filters h2 { font-size: 14px; margin-bottom: 2px; }
+#filters label { display: flex; flex-direction: column; font-size: 12px; color: #ccc; }
+#filters select, #filters input {
+  background: #fff; color: #222; border: none; border-radius: 6px;
+  padding: 5px 7px; font-size: 13px; margin-top: 2px;
+}
+.toggle-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  color: #fff !important;
+  font-size: 13px !important;
+  margin-bottom: 2px;
+}
+.toggle-row input {
+  margin: 0;
+  accent-color: #00b8d4;
+}
+.toggle-row span {
+  color: inherit;
+}
+.ghost-btn {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 #ranking {
   position: fixed;
   top: 66px; right: 12px;
@@ -68,3 +119,36 @@ header h1 { font-size: 18px; font-weight: 700; }
 .dot-strong { background: #2e7d32; }
 .dot-good { background: #f9a825; }
 .dot-weak { background: #c62828; }
+
+@media (max-width: 900px) {
+  header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .last {
+    margin-left: 0;
+    width: 100%;
+  }
+  #filters {
+    top: auto;
+    bottom: 64px;
+    left: 12px;
+    right: 12px;
+    min-width: 0;
+    max-width: none;
+  }
+  #ranking {
+    top: 96px;
+    right: 12px;
+    left: 12px;
+    min-width: 0;
+    max-height: 24vh;
+  }
+  #legend {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+}

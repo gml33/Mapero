@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mapero · Mapa en tiempo real</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -17,6 +18,46 @@
     </span>
     <span id="lastUpdate" class="last">última actualización: —</span>
   </header>
+  <aside id="filters">
+    <div class="filters-head">
+      <h2>Filtros</h2>
+      <button id="clearFiltersBtn" class="ghost-btn" type="button">Limpiar</button>
+    </div>
+    <label class="toggle-row">
+      <input id="fShowNetworks" type="checkbox" checked>
+      <span>Mostrar redes</span>
+    </label>
+    <label>Tipo
+      <select id="fType">
+        <option value="">Todas</option>
+        <option value="open">Abiertas</option>
+        <option value="protected">Protegidas</option>
+        <option value="unknown">Sin datos</option>
+      </select>
+    </label>
+    <label>Banda
+      <select id="fBand">
+        <option value="">Todas</option>
+        <option value="2.4">2,4 GHz</option>
+        <option value="5">5 GHz</option>
+        <option value="6">6 GHz</option>
+      </select>
+    </label>
+    <label>Señal mínima
+      <select id="fSig">
+        <option value="">Todas</option>
+        <option value="-80">≥ -80 dBm</option>
+        <option value="-70">≥ -70 dBm</option>
+        <option value="-60">≥ -60 dBm</option>
+      </select>
+    </label>
+    <label>Usuario
+      <select id="fUser"><option value="">Todos</option></select>
+    </label>
+    <label>Nombre
+      <input id="fQ" placeholder="Buscar red…">
+    </label>
+  </aside>
   <aside id="ranking">
     <h2>Conquista</h2>
     <ul id="rankingList"></ul>

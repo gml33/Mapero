@@ -74,6 +74,27 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ./gradlew :app:installDebug
 ```
 
+### Flujo rápido por ADB + backend local
+
+Con el celular conectado por USB y visible en `adb`, podés levantar el stack web local, abrir el túnel `adb reverse`, instalar la APK debug y lanzar la app ya apuntando al backend de tu máquina con un solo comando:
+
+```bash
+./scripts/dev-online.sh
+```
+
+Variables opcionales:
+
+```bash
+SERVER_USER=marcelo SERVER_PASS=clave123 STREAMING=true ./scripts/dev-online.sh
+```
+
+La app acepta además estos extras por `adb shell am start`:
+- `server_url`
+- `server_user`
+- `server_pass`
+- `streaming`
+- `auto_connect`
+
 > `android/local.properties` debe apuntar a tu SDK: `sdk.dir=/ruta/al/Android/sdk`. No se versiona.
 
 ---

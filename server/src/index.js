@@ -9,7 +9,8 @@ import { pool, initDb } from './db.js';
 import { buildTerritories, territoryOptions } from './territories.js';
 import { register, login, requireAuth, requireAdmin, createUser, setUserRole, setUserPassword } from './auth.js';
 import { getSettings, updateSettings, appConfig } from './config.js';
-import { rowFilters, networkFilters, aggregatedOpenSql, aggregatedBandSql, signalWeightSql } from './filters.js';
+import { rowFilters, networkPredicate, aggregatedOpenSql, aggregatedBandSql, signalWeightSql } from './filters.js';
+import { TtlCache } from './cache.js';
 
 dotenv.config();
 
@@ -49,19 +50,30 @@ app.post('/api/auth/login', async (req, res) => {
 const MAX_SPEED_MPS = 40;
 // Última posición conocida por usuario (para detectar teletransportes).
 const lastPos = new Map();
+// Filas por sentencia de inserción. Postgres admite 65535 parámetros y cada
+// fila usa 9, así que el límite real es mucho más alto; 500 deja las sentencias
+// cómodamente chicas.
+const INSERT_CHUNK = 500;
 
-// ---- Ajustes de la partida (cacheados para no leer `settings` en cada pedido) ----
-let territoryOpts = { at: 0, value: null };
-async function territorySettings() {
-  if (territoryOpts.value && Date.now() - territoryOpts.at < 10000) {
-    return territoryOpts.value;
-  }
-  const value = territoryOptions(await getSettings());
-  territoryOpts = { at: Date.now(), value };
-  return value;
+// ---- Agregados cacheados ----
+// La agregación por red y el reparto de territorios recorren la tabla entera
+// (~114 ms con 43k filas). Se calculan una vez y se_invalidan con cada ingesta,
+// así el costo no se multiplica por la cantidad de clientes ni por cada cambio
+// de filtro. La ingesta invalida, el TTL es solo la red de seguridad.
+const networksCache = new TtlCache(Number(process.env.NETWORKS_TTL_MS) || 10000);
+const territoriesCache = new TtlCache(Number(process.env.TERRITORIES_TTL_MS) || 10000);
+const settingsCache = new TtlCache(10000);
+
+function invalidateCaches() {
+  networksCache.invalidate();
+  territoriesCache.invalidate();
+  settingsCache.invalidate();
 }
-function invalidateTerritorySettings() {
-  territoryOpts = { at: 0, value: null };
+
+/** Ajustes de la partida, validados y acotados. */
+async function territorySettings() {
+  return settingsCache.resolve('territory', async () =>
+    territoryOptions(await getSettings()));
 }
 
 /** Filas de los últimos días que alimentan el juego de conquista. */
@@ -71,6 +83,41 @@ async function territoryRows() {
      FROM measurements m
      JOIN users u ON u.id = m.user_id
      WHERE m.ts > now() - interval '30 days'`);
+  return rows;
+}
+
+/** Territorios calculados. Lo comparten /territories, /leaderboard y /admin/stats. */
+function loadTerritories() {
+  return territoriesCache.resolve('territories', async () =>
+    buildTerritories(await territoryRows(), await territorySettings()));
+}
+
+/**
+ * Una fila por red (nombre de SSID, o BSSID si no tiene), agregada sobre todas
+ * sus mediciones. Se calcula una vez y se filtra en memoria.
+ */
+async function aggregateNetworks() {
+  const key = `COALESCE(NULLIF(m.ssid, ''), m.bssid)`;
+  // Centroide ponderado por señal. Si todas las muestras pesan 0 (señal muy
+  // débil) cae al promedio simple, para no dividir por cero ni devolver NaN.
+  const w = signalWeightSql('m');
+  const centroid = (col) => `CASE WHEN SUM(${w}) > 0
+      THEN SUM(${col} * ${w}) / SUM(${w}) ELSE AVG(${col}) END::double precision`;
+
+  const { rows } = await pool.query(
+    `SELECT ${key} AS name,
+            ${centroid('m.latitude')}  AS latitude,
+            ${centroid('m.longitude')} AS longitude,
+            AVG(m.rssi)::double precision      AS rssi,
+            COUNT(*)::int         AS samples,
+            MAX(m.ts)             AS last_seen,
+            (${aggregatedOpenSql('m')})::boolean AS open,
+            ${aggregatedBandSql('m')} AS band,
+            array_agg(DISTINCT u.username) AS users
+     FROM measurements m
+     JOIN users u ON u.id = m.user_id
+     GROUP BY ${key}
+     ORDER BY last_seen DESC`);
   return rows;
 }
 
@@ -118,7 +165,9 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
   }
 
   try {
-    const inserted = [];
+    // El anti-cheat es secuencial: compara cada punto con el anterior, así que
+    // se recorre la lista antes de tocar la base.
+    const rowsToInsert = [];
     let dropped = 0;
     for (const m of valid) {
       const ts = new Date(m.timestamp || Date.now()).getTime();
@@ -126,17 +175,33 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
         dropped++;
         continue;
       }
+      rowsToInsert.push([
+        req.user.id, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
+        m.frequency || null, m.capabilities || '', new Date(ts),
+      ]);
+    }
+
+    // Una sola sentencia por lote en vez de una por medición: la app sube de a
+    // 100 por barrido y antes eso eran 100 viajes de ida y vuelta.
+    const inserted = [];
+    for (let i = 0; i < rowsToInsert.length; i += INSERT_CHUNK) {
+      const params = [];
+      const tuples = rowsToInsert.slice(i, i + INSERT_CHUNK).map((row) => {
+        const start = params.length;
+        params.push(...row);
+        return `(${row.map((_, c) => '$' + (start + c + 1)).join(',')})`;
+      });
       const r = await pool.query(
         `INSERT INTO measurements
            (user_id, bssid, ssid, latitude, longitude, rssi, frequency, capabilities, ts)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         VALUES ${tuples.join(',')}
          RETURNING bssid, ssid, latitude, longitude, rssi, frequency, capabilities, ts`,
-        [req.user.id, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
-         m.frequency || null, m.capabilities || '', new Date(ts)]);
-      inserted.push(r.rows[0]);
+        params);
+      inserted.push(...r.rows);
     }
 
     if (inserted.length > 0) {
+      invalidateCaches();
       broadcast({ type: 'measurements', data: inserted });
     }
     res.json({ ok: true, inserted: inserted.length, dropped });
@@ -149,47 +214,8 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
 // ---- Redes agregadas (carga inicial para la web) ----
 app.get('/api/networks', async (req, res) => {
   try {
-    const key = `COALESCE(NULLIF(m.ssid, ''), m.bssid)`;
-    const cond = [];
-    const params = [];
-
-    if (req.query.user) {
-      params.push(req.query.user);
-      cond.push('u.username = $' + params.length);
-    }
-    if (req.query.q) {
-      params.push('%' + req.query.q + '%');
-      cond.push(`${key} ILIKE $` + params.length);
-    }
-    const filters = networkFilters(req.query, { alias: 'm', paramOffset: params.length });
-
-    const where = cond.length ? 'WHERE ' + cond.join(' AND ') : '';
-    const having = filters.having.length ? 'HAVING ' + filters.having.join(' AND ') : '';
-    params.push(...filters.params);
-
-    // Centroide ponderado por señal. Si todas las muestras pesan 0 (señal muy
-    // débil) cae al promedio simple, para no dividir por cero ni devolver NaN.
-    const w = signalWeightSql('m');
-    const centroid = (col) => `CASE WHEN SUM(${w}) > 0
-        THEN SUM(${col} * ${w}) / SUM(${w}) ELSE AVG(${col}) END::double precision`;
-
-    const { rows } = await pool.query(
-      `SELECT ${key} AS name,
-              ${centroid('m.latitude')}  AS latitude,
-              ${centroid('m.longitude')} AS longitude,
-              AVG(m.rssi)::double precision      AS rssi,
-              COUNT(*)::int         AS samples,
-              MAX(m.ts)             AS last_seen,
-              (${aggregatedOpenSql('m')})::boolean AS open,
-              ${aggregatedBandSql('m')} AS band,
-              array_agg(DISTINCT u.username) AS users
-       FROM measurements m
-       JOIN users u ON u.id = m.user_id
-       ${where}
-       GROUP BY ${key}
-       ${having}
-       ORDER BY last_seen DESC`, params);
-    res.json(rows);
+    const rows = await networksCache.resolve('all', aggregateNetworks);
+    res.json(rows.filter(networkPredicate(req.query)));
   } catch (e) {
     console.error('[api] error networks:', e);
     res.status(500).json({ error: 'Error interno' });
@@ -210,9 +236,7 @@ app.get('/api/users', async (_req, res) => {
 // ---- Territorios del juego de conquista ----
 app.get('/api/territories', async (_req, res) => {
   try {
-    const territories = buildTerritories(
-      await territoryRows(), await territorySettings());
-    res.json(territories);
+    res.json(await loadTerritories());
   } catch (e) {
     console.error('[api] error territories:', e);
     res.status(500).json({ error: 'Error interno' });
@@ -222,9 +246,8 @@ app.get('/api/territories', async (_req, res) => {
 // ---- Leaderboard (conquistas por jugador) ----
 app.get('/api/leaderboard', async (_req, res) => {
   try {
-    // Se calcula con el mismo modelo de territorios para no duplicar lógica.
-    const territories = buildTerritories(
-      await territoryRows(), await territorySettings());
+    // Sale del mismo cálculo que /territories, que ya está cacheado.
+    const territories = await loadTerritories();
 
     const perUser = new Map();
     for (const t of territories) {
@@ -297,7 +320,9 @@ app.put('/api/config', requireAdmin, async (req, res) => {
 
     if (Object.keys(patch).length) {
       await updateSettings(patch);
-      invalidateTerritorySettings();
+      // Un cambio de hex_res, decaimiento o umbral recalcula los donos.
+      territoriesCache.invalidate();
+      settingsCache.invalidate();
     }
     res.json(await appConfig());
   } catch (e) {
@@ -312,8 +337,7 @@ app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
   try {
     const users = await pool.query('SELECT COUNT(*)::int n FROM users');
     const meas = await pool.query('SELECT COUNT(*)::int n FROM measurements');
-    const territories = buildTerritories(
-      await territoryRows(), await territorySettings());
+    const territories = await loadTerritories();
     res.json({
       users: users.rows[0].n,
       measurements: meas.rows[0].n,

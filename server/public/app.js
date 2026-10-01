@@ -360,8 +360,19 @@ function scheduleRefresh() {
 hydrateFiltersFromUrl();
 loadUserOptions();
 centerOnLastPosition();
-loadNetworks();
-loadTerritories();
-loadLeaderboard();
-setInterval(() => { loadNetworks(); loadTerritories(); loadLeaderboard(); }, 30000);
+refreshAll();
 connect();
+
+// El polling es una red de seguridad: el WebSocket ya avisa cada ingesta. Con la
+// pestaña oculta no hay nadie mirando el mapa, así que se saltea.
+function refreshAll() {
+  loadNetworks();
+  loadTerritories();
+  loadLeaderboard();
+}
+setInterval(() => {
+  if (!document.hidden) refreshAll();
+}, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshAll();
+});

@@ -120,37 +120,29 @@ export function rowFilters(query = {}, { alias = 'm', paramOffset = 0 } = {}) {
 }
 
 /**
- * Condiciones de grupo para el listado de redes agregadas (/api/networks).
+ * Predicado equivalente para filtrar en memoria el agregado de redes.
  *
- * Van en HAVING y no en WHERE: `type` y `band` describen la agregación de la
- * red (modo de `capabilities` y de frecuencia). Filtrando las filas antes, una
- * red con mediciones mixtas se recalculaba solo con las filtradas y terminaba
- * clasificada como abierta y como protegida a la vez.
+ * `type` y `band` se evalúan sobre el valor agregado de la red (la moda entre
+ * sus mediciones), no por medición: es lo mismo que aplicaba el HAVING y lo que
+ * evalúa la web en el navegador. Filtrar en memoria evita repetir la agregación
+ * completa por cada cliente y por cada cambio de filtro.
  *
- * Mismo contrato de `paramOffset` que `rowFilters`.
+ * Devuelve una función `(network) => boolean`. Los valores no reconocidos se
+ * ignoran, igual que en `rowFilters`.
  */
-export function networkFilters(query = {}, { alias = 'm', paramOffset = 0 } = {}) {
-  const having = [];
-  const params = [];
-  const prefix = alias ? `${alias}.` : '';
+export function networkPredicate(query = {}) {
+  const { type, band, sig, user, q } = query;
+  const min = minSignal(query) ?? null;
+  const needle = q ? String(q).toLowerCase() : '';
 
-  if (query.type === 'open') {
-    having.push(`${aggregatedOpenSql(alias)} = 1`);
-  } else if (query.type === 'protected') {
-    having.push(`${aggregatedOpenSql(alias)} = 0`);
-  } else if (query.type === 'unknown') {
-    having.push(`${aggregatedOpenSql(alias)} IS NULL`);
-  }
-
-  if (query.band && BAND_VALUES.includes(String(query.band))) {
-    having.push(`${aggregatedBandSql(alias)} = '${query.band}'`);
-  }
-
-  const min = minSignal(query);
-  if (min !== undefined) {
-    params.push(min);
-    having.push(`AVG(${prefix}rssi) >= $${paramOffset + params.length}`);
-  }
-
-  return { having, params };
+  return (n) => {
+    if (type === 'open' && n.open !== true) return false;
+    if (type === 'protected' && n.open !== false) return false;
+    if (type === 'unknown' && n.open !== null) return false;
+    if (band && n.band !== band) return false;
+    if (min !== null && Number(n.rssi) < min) return false;
+    if (user && !(n.users || []).includes(user)) return false;
+    if (needle && !String(n.name || '').toLowerCase().includes(needle)) return false;
+    return true;
+  };
 }

@@ -147,6 +147,26 @@ function antiCheat(userId, lat, lon, tsMs) {
   return allowed;
 }
 
+/** Texto acotado: un objeto o un array no deben llegar a una columna TEXT. */
+function toText(value, maxLength) {
+  if (value === null || value === undefined) return '';
+  const s = typeof value === 'string' ? value : String(value);
+  return s.length > maxLength ? s.slice(0, maxLength) : s;
+}
+
+/** Frecuencia del canal en MHz, o null si no es un número usable. */
+function toFrequency(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+/** Momento de la medición en ms, o null si no es una fecha válida. */
+function toTimestamp(value) {
+  const t = new Date(value ?? Date.now()).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 // ---- Ingesta de mediciones (requiere sesión) ----
 app.post('/api/measurements', requireAuth, async (req, res) => {
   const list = Array.isArray(req.body) ? req.body
@@ -156,6 +176,7 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Enviar un array de mediciones' });
   }
 
+  // La geometría es lo indispensable: sin ella la fila no sirve, se descarta.
   const valid = list.filter(m =>
     m && m.bssid && Number.isFinite(m.latitude) && Number.isFinite(m.longitude)
         && Number.isFinite(m.rssi));
@@ -170,14 +191,23 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
     const rowsToInsert = [];
     let dropped = 0;
     for (const m of valid) {
-      const ts = new Date(m.timestamp || Date.now()).getTime();
+      // La geometría es lo indispensable y ya se validó. El resto de los
+      // campos es opcional: se corrigen en vez de rechazar la fila, porque la
+      // inserción es por lotes y una sola fila inválida haría fallar el lote
+      // entero (y con ella las filas buenas que la rodean).
+      const ts = toTimestamp(m.timestamp);
+      if (ts === null) {
+        dropped++;
+        continue;
+      }
       if (!antiCheat(req.user.id, m.latitude, m.longitude, ts)) {
         dropped++;
         continue;
       }
       rowsToInsert.push([
-        req.user.id, m.bssid, m.ssid || '', m.latitude, m.longitude, m.rssi,
-        m.frequency || null, m.capabilities || '', new Date(ts),
+        req.user.id, toText(m.bssid, 32), toText(m.ssid, 64),
+        m.latitude, m.longitude, Math.round(m.rssi),
+        toFrequency(m.frequency), toText(m.capabilities, 255), new Date(ts),
       ]);
     }
 

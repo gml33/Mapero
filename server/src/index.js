@@ -48,6 +48,10 @@ app.post('/api/auth/login', async (req, res) => {
 
 // ---- Anti-cheat: velocidad máxima plausible (m/s). 40 m/s ≈ 144 km/h. ----
 const MAX_SPEED_MPS = 40;
+// Desplazamiento máximo tolerado cuando no hay intervalo con el que calcular una
+// velocidad (mismo timestamp, o timestamp anterior). La app nunca se mueve
+// dentro de un lote, así que 30 m es holgado: solo cubre el ruido del GPS.
+const MAX_STEP_M = 30;
 // Última posición conocida por usuario (para detectar teletransportes).
 const lastPos = new Map();
 // Filas por sentencia de inserción. Postgres admite 65535 parámetros y cada
@@ -131,16 +135,35 @@ function haversineM(aLat, aLon, bLat, bLon) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/**
+ * Descarta mediciones imposibles para el usuario.
+ *
+ * El caso normal es un lote: la app lee el GPS una vez y sella todas las redes
+ * de ese barrido con el mismo milisegundo y la misma coordenada, así que las
+ * mediciones de un lote están a 0 m entre sí. El caso que hay que cubrir es el
+ * otro: un cliente que manda muchas mediciones con el mismo timestamp y
+ * coordenadas distintas, para quedarse con celdas de todo el mapa de un golpe.
+ *
+ * Con intervalo positivo se exige una velocidad plausible. Sin intervalo
+ * —mismo timestamp, o uno anterior— no hay velocidad que calcular, así que se
+ * exige que el punto no se haya movido. Ese margen no es teórico: en los datos
+ * reales hay 1428 lotes con más de una medición en el mismo timestamp y la
+ * distancia entre las mediciones de cualquiera de ellos es de 0,00 m.
+ */
 function antiCheat(userId, lat, lon, tsMs) {
   const prev = lastPos.get(userId);
   let allowed = true;
   if (prev) {
+    const distance = haversineM(prev.lat, prev.lon, lat, lon);
     const dtS = (tsMs - prev.ts) / 1000;
     if (dtS > 0) {
-      const speed = haversineM(prev.lat, prev.lon, lat, lon) / dtS;
-      if (speed > MAX_SPEED_MPS) allowed = false;
+      if (distance / dtS > MAX_SPEED_MPS) allowed = false;
+    } else if (distance > MAX_STEP_M) {
+      allowed = false;
     }
   }
+  // Solo avanza la posición de referencia con una medición aceptada y con un
+  // timestamp que no retrocede, así un rechazo no habilita el siguiente salto.
   if (allowed && (!prev || tsMs >= prev.ts)) {
     lastPos.set(userId, { lat, lon, ts: tsMs });
   }

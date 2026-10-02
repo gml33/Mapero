@@ -617,8 +617,14 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     }
 
     private boolean matchesFilters(WifiApSummary ap) {
+        // El tri-estado: null es "sin datos de seguridad", y no entra ni en
+        // "Abiertas" ni en "Protegidas". Lo clasifica con el mismo criterio que
+        // el servidor, así la app y la web no discrepan sobre la misma red.
+        if (filterType == 1 && ap.open == null) return false;
         if (filterType == 1 && !ap.open) return false;
+        if (filterType == 2 && ap.open == null) return false;
         if (filterType == 2 && ap.open) return false;
+        if (filterType == 3 && ap.open != null) return false;
         if (filterBand == 1 && ap.band != 1) return false;
         if (filterBand == 2 && ap.band != 2) return false;
         if (ap.avgRssi < filterMinSignal) return false;

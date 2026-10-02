@@ -2,6 +2,7 @@ package app.mapero.wifi.data;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -150,10 +151,102 @@ public class SignalAggregatorTest {
         assertEquals(2, out.size());
         for (WifiApSummary s : out) {
             if ("Abierta".equals(s.ssid)) {
-                assertTrue("sin cifrado es abierta", s.open);
+                assertEquals("sin cifrado es abierta", Boolean.TRUE, s.open);
             } else {
-                assertTrue("con WPA2 es protegida", !s.open);
+                assertEquals("con WPA2 es protegida", Boolean.FALSE, s.open);
             }
         }
+    }
+
+    // ---- Estado de seguridad tri-estado ----
+    // Las mediciones anteriores a la columna capabilities no dicen nada. Antes
+    // se contaban como abiertas, así que toda esa data aparecía como red abierta.
+
+    private static WifiApSummary oneSummary(WifiMeasurement... samples) {
+        List<WifiApSummary> out =
+                SignalAggregator.aggregateByTrilateration(Arrays.asList(samples));
+        assertEquals(1, out.size());
+        return out.get(0);
+    }
+
+    private static WifiMeasurement withCaps(String bssid, String ssid, String caps) {
+        WifiMeasurement x = m(bssid, ssid, -34.6, -58.4, -60);
+        x.capabilities = caps;
+        return x;
+    }
+
+    @Test
+    public void seguridad_sinCapabilitiesEsNullYNoAbierta() {
+        WifiApSummary s = oneSummary(withCaps("aa", "Legacy", ""));
+        assertNull("sin capabilities no se puede clasificar", s.open);
+    }
+
+    @Test
+    public void seguridad_capabilitiesNullEsNull() {
+        WifiMeasurement x = m("aa", "Legacy", -34.6, -58.4, -60);
+        x.capabilities = null;
+        assertNull(oneSummary(x).open);
+    }
+
+    @Test
+    public void seguridad_mayoriaProtegidaGana() {
+        // 3 mediciones con cifrado y 1 sin capabilities: la desconocida no cuenta
+        // como abierta, así que la red es protegida.
+        WifiApSummary s = oneSummary(
+                withCaps("aa", "Red", "[WPA2-PSK-CCMP]"),
+                withCaps("bb", "Red", "[WPA2-PSK-CCMP]"),
+                withCaps("cc", "Red", "[WPA2-PSK-CCMP]"),
+                withCaps("dd", "Red", ""));
+        assertEquals(Boolean.FALSE, s.open);
+    }
+
+    @Test
+    public void seguridad_mayoriaAbiertaGana() {
+        // 3 abiertas contra 2 protegidas: mayoría abierta, la desconocida no pesa.
+        WifiApSummary s = oneSummary(
+                withCaps("aa", "Red", "[ESS]"),
+                withCaps("bb", "Red", "[ESS]"),
+                withCaps("cc", "Red", "[ESS]"),
+                withCaps("dd", "Red", "[WPA2-PSK-CCMP]"),
+                withCaps("ee", "Red", "[WPA2-PSK-CCMP]"),
+                withCaps("ff", "Red", ""));
+        assertEquals(Boolean.TRUE, s.open);
+    }
+
+    @Test
+    public void seguridad_empateVaAProtegida() {
+        // El servidor resuelve el empate con la moda, que ordena 0=protegida
+        // antes que 1=abierta, así que el empate cae en protegida. La app tiene
+        // que coincidir o la misma red se ve distinta en el mapa y en la web.
+        WifiApSummary s = oneSummary(
+                withCaps("aa", "Red", "[ESS]"),
+                withCaps("bb", "Red", "[WPA2-PSK-CCMP]"));
+        assertEquals("el empate va a protegida", Boolean.FALSE, s.open);
+    }
+
+    @Test
+    public void seguridad_todasDesconocidasEsNull() {
+        WifiApSummary s = oneSummary(
+                withCaps("aa", "Red", ""),
+                withCaps("bb", "Red", ""),
+                withCaps("cc", "Red", ""));
+        assertNull(s.open);
+    }
+
+    @Test
+    public void seguridad_sinMuestrasDesconocidasEsNull() {
+        WifiApSummary s = oneSummary(
+                withCaps("aa", "Red", "[ESS]"),
+                withCaps("bb", "Red", "[RSN-SAE-CCMP]"));
+        assertEquals(Boolean.FALSE, s.open);
+    }
+
+    @Test
+    public void seguridad_ESSYSAEClaves() {
+        // Los marcadores de cifrado tienen que seguir detectándose.
+        assertEquals(Boolean.TRUE, oneSummary(withCaps("a", "R", "[ESS]")).open);
+        assertEquals(Boolean.FALSE, oneSummary(withCaps("a", "R", "[WPA2-PSK-CCMP][ESS]")).open);
+        assertEquals(Boolean.FALSE, oneSummary(withCaps("a", "R", "[RSN-SAE-CCMP][ESS]")).open);
+        assertEquals(Boolean.FALSE, oneSummary(withCaps("a", "R", "[WEP][ESS]")).open);
     }
 }

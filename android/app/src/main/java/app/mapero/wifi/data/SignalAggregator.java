@@ -87,7 +87,10 @@ public final class SignalAggregator {
             acc.samplesList.add(m);
             acc.rssiSum += m.rssi;
             acc.count++;
-            if (isOpenNetwork(m.capabilities)) {
+            Boolean open = isOpenNetwork(m.capabilities);
+            if (open == null) {
+                acc.unknownCount++;
+            } else if (open) {
                 acc.openCount++;
             } else {
                 acc.securedCount++;
@@ -118,16 +121,35 @@ public final class SignalAggregator {
                 }
             }
             s.samples = Math.toIntExact(acc.count);
-            s.open = acc.openCount > 0 && acc.openCount >= acc.securedCount;
+            s.open = majorityOpen(acc);
             s.band = acc.band5 >= acc.band24 ? (acc.band5 > 0 ? 2 : 0) : 1;
             out.add(s);
         }
         return out;
     }
 
-    /** Una red es abierta si sus capabilities no indican cifrado. */
-    private static boolean isOpenNetwork(String caps) {
-        if (caps == null || caps.isEmpty()) return true;
+    /**
+     * Estado de seguridad del grupo: mayoría simple entre las muestras que sí
+     * traen capabilities, y null si ninguna lo trae.
+     *
+     * El empate va a "protegida" a propósito, que es lo que resuelve la moda del
+     * servidor: si no se puede distinguir, conviene mostrar la red como
+     * protegida y no como abierta.
+     */
+    private static Boolean majorityOpen(Acc acc) {
+        int known = acc.openCount + acc.securedCount;
+        if (known == 0) return null;
+        return acc.openCount > acc.securedCount;
+    }
+
+    /**
+     * Una red es abierta si sus capabilities no indican cifrado, protegida si
+     * indican alguno, y null si no hay capabilities: en ese caso no se puede
+     * clasificar. Contar lo vacío como abierta marcaba como abiertas todas las
+     * mediciones tomadas antes de que existiera la columna.
+     */
+    private static Boolean isOpenNetwork(String caps) {
+        if (caps == null || caps.isEmpty()) return null;
         return !caps.contains("WPA") && !caps.contains("WEP")
                 && !caps.contains("RSN") && !caps.contains("SAE")
                 && !caps.contains("PSK");
@@ -209,6 +231,7 @@ public final class SignalAggregator {
         String ssid;
         int openCount;
         int securedCount;
+        int unknownCount;
         int band24;
         int band5;
         List<WifiMeasurement> samplesList;

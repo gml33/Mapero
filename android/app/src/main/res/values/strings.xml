@@ -17,6 +17,7 @@
         <item>Todas</item>
         <item>Abiertas</item>
         <item>Protegidas</item>
+        <item>Sin datos</item>
     </string-array>
     <string-array name="filter_band">
         <item>Todas</item>

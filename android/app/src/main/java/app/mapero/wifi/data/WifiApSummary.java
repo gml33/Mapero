@@ -12,8 +12,15 @@ public class WifiApSummary {
     public double avgLatitude;
     public double avgLongitude;
     public int samples;
-    /** true si la red es abierta (sin cifrado). */
-    public boolean open;
+    /**
+     * Estado de seguridad de la red: true abierta, false protegida,
+     * null si las mediciones no traen capabilities y no se puede clasificar.
+     *
+     * El tri-estado importa porque las mediciones anteriores a la columna
+     * capabilities no dicen nada: no son redes abiertas, son redes sin dato.
+     * El servidor clasifica igual, con el mismo criterio.
+     */
+    public Boolean open;
     /** 1 = 2,4 GHz, 2 = 5 GHz, 0 = desconocida. */
     public int band;
 }

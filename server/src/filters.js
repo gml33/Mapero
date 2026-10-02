@@ -142,11 +142,13 @@ export function rowFilters(query = {}, { alias = 'm', paramOffset = 0 } = {}) {
  */
 export function networkPredicate(query = {}) {
   const { type, user, q } = query;
+  // `days` opcional: si no se pasa, no se filtra por fecha.
+  const days = query.days !== undefined ? Number(query.days) : null;
+  const needle = q ? String(q).toLowerCase() : '';
+  const min = minSignal(query) ?? null;
   // Igual que `rowFilters`: una banda que no existe se ignora en vez de vaciar
   // el resultado. Sin esta validación, `?band=xyz` dejaba el mapa sin redes.
   const band = BAND_VALUES.includes(String(query.band)) ? String(query.band) : null;
-  const min = minSignal(query) ?? null;
-  const needle = q ? String(q).toLowerCase() : '';
 
   return (n) => {
     if (type === 'open' && n.open !== true) return false;
@@ -154,6 +156,10 @@ export function networkPredicate(query = {}) {
     if (type === 'unknown' && n.open !== null) return false;
     if (band && n.band !== band) return false;
     if (min !== null && Number(n.rssi) < min) return false;
+    if (days !== null && Number.isFinite(days)) {
+      const daysAgo = Date.now() - days * 24 * 60 * 60 * 1000;
+      if (new Date(n.last_seen).getTime() < daysAgo) return false;
+    }
     if (user && !(n.users || []).includes(user)) return false;
     if (needle && !String(n.name || '').toLowerCase().includes(needle)) return false;
     return true;

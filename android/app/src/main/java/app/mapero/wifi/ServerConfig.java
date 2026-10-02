@@ -2,11 +2,19 @@ package app.mapero.wifi;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKeys;
+
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 
 /**
  * Configuración del servidor remoto para la sincronización en tiempo real.
  * - serverUrl: URL base de la API (p. ej. http://192.168.0.12:8080).
- * - apiKey: clave de escritura usada por el servidor.
+ * - Credenciales y token almacenados de forma cifrada mediante
+ *   EncryptedSharedPreferences (Android Keystore).
  */
 public final class ServerConfig {
 
@@ -48,9 +56,24 @@ public final class ServerConfig {
         lastUploaded = 0L;
     }
 
+    private static SharedPreferences getEncryptedPrefs(Context context) {
+        try {
+            String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
+            return EncryptedSharedPreferences.create(
+                    PREFS,
+                    masterKeyAlias,
+                    context,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+        } catch (GeneralSecurityException | IOException e) {
+            throw new RuntimeException("No se pudo crear EncryptedSharedPreferences", e);
+        }
+    }
+
     public static ServerConfig load(Context context) {
         ServerConfig c = new ServerConfig();
-        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences sp = getEncryptedPrefs(context);
         c.serverUrl = sp.getString(KEY_URL, DEFAULT_URL);
         c.username = sp.getString(KEY_USER, "");
         c.password = sp.getString(KEY_PASS, "");
@@ -62,8 +85,8 @@ public final class ServerConfig {
     }
 
     public void save(Context context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
+        SharedPreferences sp = getEncryptedPrefs(context);
+        sp.edit()
                 .putString(KEY_URL, serverUrl)
                 .putString(KEY_USER, username)
                 .putString(KEY_PASS, password)

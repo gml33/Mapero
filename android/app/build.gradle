@@ -66,6 +66,9 @@ dependencies {
     implementation 'androidx.room:room-runtime:2.6.1'
     annotationProcessor 'androidx.room:room-compiler:2.6.1'
 
+    // Security: credenciales cifradas
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
     // Tests unitarios de la lógica pura (Trilateration, SignalAggregator) y de
     // las migraciones de Room. Corren en la JVM, sin emulador.
     testImplementation 'junit:junit:4.13.2'
@@ -74,8 +77,5 @@ dependencies {
     testImplementation 'androidx.test:core:1.6.1'
     testImplementation 'androidx.room:room-testing:2.6.1'
     testImplementation 'org.robolectric:robolectric:4.14.1'
-    // Declarado como dependencia para que Gradle lo resuelva y lo cachee. Si no,
-    // Robolectric lo baja a ~/.m2 la primera vez que corre un test, y el cache
-    // de CI no cubre ese directorio. Es el build de API 34 que usa @Config.
     testImplementation 'org.robolectric:android-all-instrumented:14-robolectric-10818077-i7'
 }

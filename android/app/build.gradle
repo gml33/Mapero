@@ -2,6 +2,9 @@ plugins {
     id 'com.android.application'
 }
 
+// Dónde Room deja el JSON del esquema en cada build.
+def roomSchemaDir = "$projectDir/schemas"
+
 android {
     namespace 'app.mapero.wifi'
     compileSdk 34
@@ -24,6 +27,23 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    sourceSets {
+        // El esquema se versiona en app/schemas para que las migraciones se
+        // puedan verificar con MigrationTestHelper. Sin esto, un error en una
+        // migración solo aparece en el dispositivo, con los datos del usuario ya
+        // adentro.
+        test {
+            assets.srcDirs += "$projectDir/schemas"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += [
+        "-Aroom.schemaLocation=$roomSchemaDir".toString(),
+        "-Aroom.incremental=true".toString(),
+    ]
 }
 
 dependencies {
@@ -38,4 +58,8 @@ dependencies {
     // Room + SQLite
     implementation 'androidx.room:room-runtime:2.6.1'
     annotationProcessor 'androidx.room:room-compiler:2.6.1'
+
+    // Tests unitarios de la lógica pura (Trilateration, SignalAggregator).
+    // Corren en la JVM, sin emulador.
+    testImplementation 'junit:junit:4.13.2'
 }

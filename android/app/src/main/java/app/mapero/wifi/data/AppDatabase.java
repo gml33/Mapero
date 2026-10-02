@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-@Database(entities = {WifiMeasurement.class}, version = 4, exportSchema = false)
+@Database(entities = {WifiMeasurement.class}, version = 4, exportSchema = true)
 public abstract class AppDatabase extends RoomDatabase {
 
     private static volatile AppDatabase INSTANCE;

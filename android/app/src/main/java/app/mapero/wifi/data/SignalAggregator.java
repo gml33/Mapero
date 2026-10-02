@@ -96,8 +96,9 @@ public final class SignalAggregator {
                 acc.securedCount++;
             }
             if (m.frequency > 0) {
-                if (m.frequency < 3000) acc.band24++;
-                else acc.band5++;
+                if (m.frequency >= 5925) acc.band6++;
+                else if (m.frequency >= 3000) acc.band5++;
+                else acc.band24++;
             }
         }
 
@@ -122,7 +123,7 @@ public final class SignalAggregator {
             }
             s.samples = Math.toIntExact(acc.count);
             s.open = majorityOpen(acc);
-            s.band = acc.band5 >= acc.band24 ? (acc.band5 > 0 ? 2 : 0) : 1;
+            s.band = dominantBand(acc);
             out.add(s);
         }
         return out;
@@ -140,6 +141,21 @@ public final class SignalAggregator {
         int known = acc.openCount + acc.securedCount;
         if (known == 0) return null;
         return acc.openCount > acc.securedCount;
+    }
+
+    /**
+     * Banda de la red: la más frecuente entre las mediciones con frecuencia
+     * conocida, y 0 si ninguna la trae.
+     *
+     * Los >= son a propósito: en un empate gana la banda más baja, que es lo que
+     * hace la moda del servidor al ordenar 2,4 antes que 5 antes que 6. Y 6 GHz
+     * cuenta como su propio grupo, así una red WiFi 6E no se muestra como 5 GHz.
+     */
+    private static int dominantBand(Acc acc) {
+        if (acc.band24 + acc.band5 + acc.band6 == 0) return 0;
+        if (acc.band24 >= acc.band5 && acc.band24 >= acc.band6) return 1;
+        if (acc.band5 >= acc.band6) return 2;
+        return 3;
     }
 
     /**
@@ -234,6 +250,7 @@ public final class SignalAggregator {
         int unknownCount;
         int band24;
         int band5;
+        int band6;
         List<WifiMeasurement> samplesList;
     }
 }

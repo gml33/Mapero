@@ -21,6 +21,6 @@ public class WifiApSummary {
      * El servidor clasifica igual, con el mismo criterio.
      */
     public Boolean open;
-    /** 1 = 2,4 GHz, 2 = 5 GHz, 0 = desconocida. */
+    /** 1 = 2,4 GHz · 2 = 5 GHz · 3 = 6 GHz (WiFi 6E) · 0 = desconocida. */
     public int band;
 }

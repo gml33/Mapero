@@ -627,6 +627,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
         if (filterType == 3 && ap.open != null) return false;
         if (filterBand == 1 && ap.band != 1) return false;
         if (filterBand == 2 && ap.band != 2) return false;
+        if (filterBand == 3 && ap.band != 3) return false;
         if (ap.avgRssi < filterMinSignal) return false;
         if (hiddenNetworkNames.contains(normalizeNetworkName(nameFor(ap)))) return false;
         return true;

@@ -17,12 +17,18 @@ import java.util.List;
 public class SignalAggregatorTest {
 
     private static WifiMeasurement m(String bssid, String ssid, double lat, double lon, int rssi) {
+        return m(bssid, ssid, lat, lon, rssi, 0);
+    }
+
+    private static WifiMeasurement m(String bssid, String ssid, double lat, double lon,
+                                    int rssi, int frequency) {
         WifiMeasurement x = new WifiMeasurement();
         x.bssid = bssid;
         x.ssid = ssid;
         x.latitude = lat;
         x.longitude = lon;
         x.rssi = rssi;
+        x.frequency = frequency;
         x.capabilities = "[WPA2-PSK-CCMP][RSN-SAE-CCMP]";
         return x;
     }
@@ -248,5 +254,62 @@ public class SignalAggregatorTest {
         assertEquals(Boolean.FALSE, oneSummary(withCaps("a", "R", "[WPA2-PSK-CCMP][ESS]")).open);
         assertEquals(Boolean.FALSE, oneSummary(withCaps("a", "R", "[RSN-SAE-CCMP][ESS]")).open);
         assertEquals(Boolean.FALSE, oneSummary(withCaps("a", "R", "[WEP][ESS]")).open);
+    }
+
+    // ---- Banda ----
+    // 1 = 2,4 GHz · 2 = 5 GHz · 3 = 6 GHz · 0 = desconocida.
+    // Los límites tienen que ser los mismos que en filters.js del servidor,
+    // si no la misma red se muestra con una banda en la app y otra en la web.
+
+    private static WifiApSummary banda(int... frecuencias) {
+        List<WifiMeasurement> lista = new ArrayList<>();
+        for (int f : frecuencias) {
+            lista.add(m("bs" + f + "-" + lista.size(), "R", -34.6, -58.4, -60, f));
+        }
+        return SignalAggregator.aggregateByTrilateration(lista).get(0);
+    }
+
+    @Test
+    public void banda_limitesDeCadaGrupo() {
+        assertEquals("2412 MHz", 1, banda(2412).band);
+        assertEquals("2999 MHz, el tope de 2,4", 1, banda(2999).band);
+        assertEquals("3000 MHz, el piso de 5", 2, banda(3000).band);
+        assertEquals("5180 MHz", 2, banda(5180).band);
+        assertEquals("5924 MHz, el tope de 5", 2, banda(5924).band);
+        assertEquals("5925 MHz, el piso de 6", 3, banda(5925).band);
+        assertEquals("7115 MHz, WiFi 6E", 3, banda(7115).band);
+    }
+
+    @Test
+    public void banda_sinFrecuenciaEsDesconocida() {
+        assertEquals("frecuencia 0", 0, banda(0).band);
+        assertEquals("frecuencia negativa", 0, banda(-1).band);
+    }
+
+    @Test
+    public void banda_ganaLaMasFrecuente() {
+        assertEquals("2,4 mayoritaria", 1, banda(2412, 2412, 5180).band);
+        assertEquals("5 mayoritaria", 2, banda(2412, 5180, 5180).band);
+        assertEquals("6 mayoritaria", 3, banda(2412, 5925, 7115).band);
+    }
+
+    @Test
+    public void banda_unaRedDualBandTomaLaMasFrecuente() {
+        // Un AP que emite en 2,4 y 5: gana la banda donde se lo ve más.
+        assertEquals(2, banda(2412, 5180, 5180, 5180).band);
+        assertEquals(1, banda(2412, 2412, 2412, 5180).band);
+    }
+
+    @Test
+    public void banda_empateGanaLaMasBaja() {
+        // Es lo que hace la moda del servidor: ordena 2,4 antes que 5 antes que 6.
+        assertEquals("2,4 contra 5", 1, banda(2412, 5180).band);
+        assertEquals("5 contra 6", 2, banda(5180, 5925).band);
+    }
+
+    @Test
+    public void banda_6ghzNoSeReportaComo5() {
+        // El bug: todo lo de 3000 MHz para arriba caía en el grupo de 5 GHz.
+        assertTrue("una red 6E pura tiene que decir 6 GHz", banda(5925).band == 3);
     }
 }

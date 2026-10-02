@@ -291,7 +291,11 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
 
     // Una sola sentencia por lote en vez de una por medición: la app sube de a
     // 100 por barrido y antes eso eran 100 viajes de ida y vuelta.
+    // ON CONFLICT: si el cliente reenvía un lote que ya estaba, se ignora en vez
+    // de duplicar. RETURNING trae solo lo insertado de verdad, así que el
+    // cliente tiene que avanzar su cursor con lo que intentó, no con esto.
     const inserted = [];
+    let repetidas = 0;
     for (let i = 0; i < rowsToInsert.length; i += INSERT_CHUNK) {
       const params = [];
       const tuples = rowsToInsert.slice(i, i + INSERT_CHUNK).map((row) => {
@@ -303,9 +307,11 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
         `INSERT INTO measurements
            (user_id, bssid, ssid, latitude, longitude, rssi, frequency, capabilities, ts)
          VALUES ${tuples.join(',')}
+         ON CONFLICT (user_id, bssid, ts) DO NOTHING
          RETURNING bssid, ssid, latitude, longitude, rssi, frequency, capabilities, ts`,
         params);
       inserted.push(...r.rows);
+      repetidas += rowsToInsert.slice(i, i + INSERT_CHUNK).length - r.rows.length;
     }
 
     if (inserted.length > 0) {
@@ -313,7 +319,7 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
       broadcast({ type: 'measurements', data: inserted });
       announceIngest(inserted.length);
     }
-    res.json({ ok: true, inserted: inserted.length, dropped });
+    res.json({ ok: true, inserted: inserted.length, duplicates: repetidas, dropped });
   } catch (e) {
     console.error('[api] error ingesta:', e);
     res.status(500).json({ error: 'Error interno' });

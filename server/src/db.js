@@ -41,6 +41,11 @@ CREATE INDEX IF NOT EXISTS idx_measurements_ts ON measurements (ts);
 CREATE INDEX IF NOT EXISTS idx_measurements_ssid ON measurements (ssid);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
 
+-- El índice único de deduplicación (user_id, bssid, ts) no va acá a propósito:
+-- se crea en dedupeMeasurements(), después de borrar las copias que ya haya.
+-- Si estuviera en este bloque, fallaría en una base que arrastra duplicados y
+-- abortaría el arranque entero.
+
 -- Configuración del sistema (clave -> valor)
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
@@ -69,6 +74,7 @@ export async function initDb() {
                     TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '30 days')`);
   // Sesiones vencidas.
   await pool.query('DELETE FROM sessions WHERE expires_at <= now()');
+  await dedupeMeasurements();
   // Siembra los valores por defecto de configuración.
   for (const [k, v] of Object.entries(DEFAULTS)) {
     await pool.query(
@@ -77,6 +83,44 @@ export async function initDb() {
   }
   await promoteAdmin();
   console.log('[db] esquema listo');
+}
+
+/**
+ * Saca las mediciones repetidas y crea el índice único que las evita.
+ *
+ * La app subía el mismo lote cada vez que se abría, porque el cursor de subida
+ * solo avanzaba en el sync completo y no en el streaming. Eso dejó copias
+ * exactas de la misma medición, y el índice único no se puede crear con
+ * duplicados presentes.
+ *
+ * Solo se pisan filas idénticas: si un mismo usuario registró el mismo AP en el
+ * mismo milisegundo con datos distintos, se conservan todas.
+ */
+async function dedupeMeasurements() {
+  const existe = await pool.query(
+    `SELECT 1 FROM pg_indexes WHERE indexname = 'idx_measurements_dedup'`);
+  if (existe.rowCount > 0) return;
+
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int n FROM (
+       SELECT MIN(id) FROM measurements
+       GROUP BY user_id, bssid, ts HAVING COUNT(*) > 1) g`);
+  const repetidas = rows[0].n;
+  if (repetidas === 0) {
+    await pool.query(
+      `CREATE UNIQUE INDEX idx_measurements_dedup ON measurements (user_id, bssid, ts)`);
+    return;
+  }
+
+  const borradas = await pool.query(
+    `DELETE FROM measurements WHERE id IN (
+       SELECT id FROM (
+         SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id, bssid, ts ORDER BY id) AS rn
+         FROM measurements) g
+       WHERE g.rn > 1)`);
+  await pool.query(
+    `CREATE UNIQUE INDEX idx_measurements_dedup ON measurements (user_id, bssid, ts)`);
+  console.log(`[db] ${repetidas} mediciones repetidas: borradas ${borradas.rowCount} copias`);
 }
 
 /**

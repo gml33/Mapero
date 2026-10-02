@@ -42,9 +42,11 @@ app.get('/admin', (_req, res) =>
 // loguee sin problema y demasiado poco para fuerza bruta.
 const loginLimiter = new RateLimiter(15 * 60 * 1000, 10);
 const registerLimiter = new RateLimiter(60 * 60 * 1000, 5);
+const ingestLimiter = new RateLimiter(60 * 1000, 2000);
 setInterval(() => {
   loginLimiter.sweep();
   registerLimiter.sweep();
+  ingestLimiter.sweep();
 }, 5 * 60 * 1000).unref();
 
 /** IP del cliente, detrás de un proxy si lo declara. */
@@ -196,6 +198,13 @@ function toTimestamp(value) {
 
 // ---- Ingesta de mediciones (requiere sesión) ----
 app.post('/api/measurements', requireAuth, async (req, res) => {
+  const gate = ingestLimiter.hit(req.user.id);
+  if (!gate.allowed) {
+    res.set('Retry-After', String(gate.retryAfterS));
+    return res.status(429).json({
+      error: `Demasiadas peticiones de ingesta. Probá de nuevo en ${gate.retryAfterS} s.`,
+    });
+  }
   const list = Array.isArray(req.body) ? req.body
     : Array.isArray(req.body?.measurements) ? req.body.measurements : null;
 

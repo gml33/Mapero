@@ -24,3 +24,6 @@ server/.env
 
 # OS
 .DS_Store
+
+# Respaldo de la base local del servidor (no versionar)
+server/backups/

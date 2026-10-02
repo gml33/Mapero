@@ -77,7 +77,7 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 | `POST` | `/api/auth/login` | — | Inicia sesión → `{token, username}`. 10 intentos por IP+usuario cada 15 min. |
 | `POST` | `/api/auth/logout` | `Bearer` | Cierra la sesión del token. |
 | `GET` | `/api/auth/policy` | — | Mínimo de contraseña del servidor. |
-| `POST` | `/api/measurements` | `Bearer` | Ingresa mediciones del usuario autenticado. Emite broadcast por WS. |
+| `POST` | `/api/measurements` | `Bearer` | Ingresa mediciones. Emite broadcast por WS. Idempotente: una medición repetida se ignosa y vuelve en `duplicates`. |
 | `GET` | `/api/networks` | — | Redes agregadas (carga inicial de la web). Admite filtros, ver abajo. |
 | `GET` | `/api/users` | — | Lista de usuarios para el filtro del mapa. |
 | `GET` | `/api/territories` | — | Hexágonos (H3) conquistados y su dueño. |
@@ -91,6 +91,17 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 | `GET` | `/api/last-position` | — | Última posición medida (centrado inicial). |
 | `GET` | `/health` | — | Estado. |
 | `WS` | `/ws` | opcional | Con `?token=...` emite las mediciones en vivo. Sin token solo emite `{type:"ingest", count}`, un aviso para recargar los agregados públicos. |
+
+### Deduplicación
+
+Una medición se identifica por `(user_id, bssid, ts)` y hay un índice único que
+lo garantiza. La app manda lotes de a 100 y un mismo lote puede reenviarse (por
+ejemplo si la subida se corta a mitad), así que la ingesta es idempotente:
+`ON CONFLICT DO NOTHING` y la respuesta distingue `inserted` de `duplicates`.
+
+El índice se crea en el arranque, después de borrar las copias que ya existieran
+de instalaciones anteriores, por eso no está en el bloque de `CREATE TABLE`: con
+duplicados presentes esa sentencia abortaría todo el arranque.
 
 ### Ejemplo de ingesta
 ```bash

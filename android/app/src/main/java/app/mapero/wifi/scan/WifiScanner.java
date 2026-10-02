@@ -198,18 +198,24 @@ public class WifiScanner {
         notifyScanDone(count);
 
         if (!batch.isEmpty()) {
+            // El streaming se decide antes de entrar al hilo: leer las
+            // preferencias desde la base de datos en cada barrido es trabajo de
+            // disco que no corresponde al hilo del escaneo.
+            final boolean streaming = ServerConfig.load(this.context).streaming;
             dbExecutor.execute(() -> {
                 try {
                     database.wifiDao().insertAll(batch);
                     Log.d(TAG, "Guardados " + batch.size() + " AP");
+                    // La subida va después del insert y en el mismo hilo: Room
+                    // asigna el id recién al insertar, y el cursor de subida es
+                    // ese id. Si se subiera antes, leería id = 0.
+                    if (streaming) {
+                        uploader.enqueue(batch);
+                    }
                 } catch (Exception e) {
                     Log.e(TAG, "Error guardando", e);
                 }
             });
-            // Sube el mismo lote al servidor solo si el streaming está activo.
-            if (ServerConfig.load(this.context).streaming) {
-                uploader.enqueue(batch);
-            }
         }
     }
 

@@ -19,6 +19,7 @@ public final class ServerConfig {
     private static final String KEY_TOKEN = "token";
     private static final String KEY_STREAMING = "streaming";
     private static final String KEY_LAST_UPLOADED = "lastUploaded";
+    private static final String KEY_LAST_UPLOADED_ID = "lastUploadedId";
 
     public String serverUrl;
     public String username;
@@ -26,7 +27,15 @@ public final class ServerConfig {
     public String token;
     /** Si true, sube los datos en tiempo real al servidor; si false, solo local. */
     public boolean streaming;
-    /** Último timestamp de medición ya subido al servidor. */
+    /**
+     * Cursor de subida: id de la última medición que el servidor confirmó.
+     *
+     * Antes era un timestamp, lo que perdía las mediciones que compartían
+     * milisegundo y obligaba a comparar contra el campo de cada fila. Queda
+     * guardado por compatibilidad para poder convertirlo una vez.
+     */
+    public long lastUploadedId;
+    /** Cursor viejo (timestamp en ms). 0 = nunca se usó. */
     public long lastUploaded;
 
     public ServerConfig() {
@@ -35,6 +44,7 @@ public final class ServerConfig {
         password = "";
         token = "";
         streaming = true;
+        lastUploadedId = 0L;
         lastUploaded = 0L;
     }
 
@@ -46,6 +56,7 @@ public final class ServerConfig {
         c.password = sp.getString(KEY_PASS, "");
         c.token = sp.getString(KEY_TOKEN, "");
         c.streaming = sp.getBoolean(KEY_STREAMING, true);
+        c.lastUploadedId = sp.getLong(KEY_LAST_UPLOADED_ID, 0L);
         c.lastUploaded = sp.getLong(KEY_LAST_UPLOADED, 0L);
         return c;
     }
@@ -59,6 +70,7 @@ public final class ServerConfig {
                 .putString(KEY_TOKEN, token)
                 .putBoolean(KEY_STREAMING, streaming)
                 .putLong(KEY_LAST_UPLOADED, lastUploaded)
+                .putLong(KEY_LAST_UPLOADED_ID, lastUploadedId)
                 .apply();
     }
 

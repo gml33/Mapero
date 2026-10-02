@@ -106,6 +106,7 @@ La app acepta además estos extras por `adb shell am start`:
    - Para **subir datos** al servidor hace falta estar conectado: **menú (⋮) → Servidor → Conectar** (usuario + contraseña; si no existe se crea).
    - Usá el botón **"Streaming: ON/OFF"** (abajo a la izquierda) para decidir si los datos se suben en vivo al servidor o se guardan solo en el dispositivo.
    - Al **conectar** o al **activar el streaming**, la app sube automáticamente las mediciones pendientes que se hicieron con streaming apagado.
+   - La subida es **incremental**: la app lleva el id de la última fila que el servidor confirmó y solo manda lo que falta. El servidor ignora lo que ya tiene, así que un reenvío no duplica nada.
 3. **Caminá** por la zona a mapear.
 4. Al volver, la app muestra los puntos coloreados por intensidad sobre las cuadras recorridas.
 5. Usá el **menú (⋮)** para **exportar a CSV/KML**, **borrar** los datos o **calibrar** la trilateración (potencia a 1 m y exponente de pérdida).

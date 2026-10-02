@@ -147,3 +147,35 @@ La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su
 La app sube cada barrido a `{serverUrl}/api/measurements`. Configurar la URL y la API key desde **Mapero → menú (⋮) → Servidor**. Para desarrollo en la misma red local, la URL del servidor es la IP LAN de la máquina (p. ej. `http://192.168.0.12:8080`).
 
 El envío se controla con el botón **"Streaming: ON/OFF"** de la app: con ON, cada barrido se sube en tiempo real; con OFF, los datos quedan solo en el dispositivo.
+
+## Tests
+
+```bash
+cd server
+npm test        # 45 pruebas de la lógica pura (sin base de datos)
+npm run check   # sintaxis de los 9 archivos JS
+```
+
+Cubren la agregación de territories (decaimiento, dominio, disputa, límites de los
+ajustes), el filtrado de redes (los cuatro filtros y sus combinaciones, y que un
+parámetro no reconocido se ignore en vez de vaciar la respuesta) y la caché con
+TTL (incluida la coalescencia de pedidos concurrentes y qué pasa cuando la
+consulta falla).
+
+```bash
+cd android
+./gradlew :app:testDebugUnitTest    # 19 pruebas de Trilateration y SignalAggregator
+```
+
+Corren en la JVM, sin emulador. `./gradlew :app:connectedDebugAndroidTest`
+ejecuta las pruebas instrumentadas, que necesitan un dispositivo conectado.
+
+CI (`.github/workflows/ci.yml`) corre los dos grupos en cada push.
+
+### Migraciones de Room
+
+El esquema se versiona en `android/app/schemas/`. La migración 2 → 4 reconstruye
+la tabla y todavía **no tiene prueba automática**: `MigrationTestHelper` necesita
+el JSON del esquema v2, que nunca se exportó porque `exportSchema` estaba en
+`false`. Para cubrirla hay que exportar (o escribir a mano) el esquema histórico
+v2 y agregar la prueba, que necesita un dispositivo o Robolectric.

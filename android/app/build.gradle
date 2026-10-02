@@ -7,12 +7,12 @@ def roomSchemaDir = "$projectDir/schemas"
 
 android {
     namespace 'app.mapero.wifi'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "app.mapero.wifi"
         minSdk 26
-        targetSdk 34
+        targetSdk 35
         versionCode 1
         versionName "1.0"
     }

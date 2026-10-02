@@ -14,6 +14,7 @@ import { getSettings, updateSettings, appConfig } from './config.js';
 import { rowFilters, networkPredicate, aggregatedOpenSql, aggregatedBandSql, signalWeightSql } from './filters.js';
 import { TtlCache } from './cache.js';
 import { RateLimiter } from './rate-limit.js';
+import { AntiCheat } from './anti-cheat.js';
 
 dotenv.config();
 
@@ -91,17 +92,17 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
 /** Mínimo de contraseña, para que el panel y la app lo muestren. */
 app.get('/api/auth/policy', (_req, res) => res.json({ minPassword: minPassword() }));
 
-// ---- Anti-cheat: velocidad máxima plausible (m/s). 40 m/s ≈ 144 km/h. ----
-const MAX_SPEED_MPS = 40;
-// Desplazamiento máximo tolerado cuando no hay intervalo con el que calcular una
-// velocidad (mismo timestamp, o timestamp anterior). La app nunca se mueve
-// dentro de un lote, así que 30 m es holgado: solo cubre el ruido del GPS.
-const MAX_STEP_M = 30;
-// Última posición conocida por usuario (para detectar teletransportes).
-// Con tope: sin esto el Map crece con cada usuario que alguna vez ingesta y no
-// vuelve a vaciarse nunca.
-const lastPos = new Map();
-const MAX_TRACKED_USERS = 10000;
+// Anti-cheat de velocidad. El registro de posiciones vive en memoria y se
+// vacía al reiniciar el servidor; además se poda por antigüedad para que un
+// usuario que vuelve tras meses no quede condicionado por una posición vieja.
+/** Cada cuánto se poda el registro de posiciones. */
+const POSITION_TTL_MS = 6 * 3600 * 1000;
+
+const antiCheat = new AntiCheat();
+setInterval(() => {
+  antiCheat.forgetOlderThan(Date.now() - POSITION_TTL_MS);
+}, POSITION_TTL_MS).unref();
+
 // Filas por sentencia de inserción. Postgres admite 65535 parámetros y cada
 // fila usa 9, así que el límite real es mucho más alto; 500 deja las sentencias
 // cómodamente chicas.
@@ -173,58 +174,6 @@ async function aggregateNetworks() {
   return rows;
 }
 
-function haversineM(aLat, aLon, bLat, bLon) {
-  const R = 6371000;
-  const dLat = (bLat - aLat) * Math.PI / 180;
-  const dLon = (bLon - aLon) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(aLat * Math.PI / 180) * Math.cos(bLat * Math.PI / 180)
-      * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-/**
- * Descarta mediciones imposibles para el usuario.
- *
- * El caso normal es un lote: la app lee el GPS una vez y sella todas las redes
- * de ese barrido con el mismo milisegundo y la misma coordenada, así que las
- * mediciones de un lote están a 0 m entre sí. El caso que hay que cubrir es el
- * otro: un cliente que manda muchas mediciones con el mismo timestamp y
- * coordenadas distintas, para quedarse con celdas de todo el mapa de un golpe.
- *
- * Con intervalo positivo se exige una velocidad plausible. Sin intervalo
- * —mismo timestamp, o uno anterior— no hay velocidad que calcular, así que se
- * exige que el punto no se haya movido. Ese margen no es teórico: en los datos
- * reales hay 1428 lotes con más de una medición en el mismo timestamp y la
- * distancia entre las mediciones de cualquiera de ellos es de 0,00 m.
- */
-function antiCheat(userId, lat, lon, tsMs) {
-  const prev = lastPos.get(userId);
-  let allowed = true;
-  if (prev) {
-    const distance = haversineM(prev.lat, prev.lon, lat, lon);
-    const dtS = (tsMs - prev.ts) / 1000;
-    if (dtS > 0) {
-      if (distance / dtS > MAX_SPEED_MPS) allowed = false;
-    } else if (distance > MAX_STEP_M) {
-      allowed = false;
-    }
-  }
-  // Solo avanza la posición de referencia con una medición aceptada y con un
-  // timestamp que no retrocede, así un rechazo no habilita el siguiente salto.
-  if (allowed && (!prev || tsMs >= prev.ts)) {
-    // Al llegar al tope se descarta la entrada más antigua: es la que menos
-    // probable es que vuelva, y perderla solo hace que ese usuario pierda la
-    // referencia de un salto, no la protección de los siguientes.
-    if (lastPos.size >= MAX_TRACKED_USERS && !lastPos.has(userId)) {
-      const masAntigua = lastPos.keys().next().value;
-      lastPos.delete(masAntigua);
-    }
-    lastPos.set(userId, { lat, lon, ts: tsMs });
-  }
-  return allowed;
-}
-
 /** Texto acotado: un objeto o un array no deben llegar a una columna TEXT. */
 function toText(value, maxLength) {
   if (value === null || value === undefined) return '';
@@ -278,7 +227,7 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
         dropped++;
         continue;
       }
-      if (!antiCheat(req.user.id, m.latitude, m.longitude, ts)) {
+      if (!antiCheat.accepts(req.user.id, m.latitude, m.longitude, ts)) {
         dropped++;
         continue;
       }

@@ -184,18 +184,33 @@ consulta falla).
 
 ```bash
 cd android
-./gradlew :app:testDebugUnitTest    # 19 pruebas de Trilateration y SignalAggregator
+./gradlew :app:testDebugUnitTest    # 34 pruebas, sin emulador
 ```
 
 Corren en la JVM, sin emulador. `./gradlew :app:connectedDebugAndroidTest`
 ejecuta las pruebas instrumentadas, que necesitan un dispositivo conectado.
 
+Las migraciones de Room se verifican con `MigrationTestHelper` sobre
+**Robolectric**, así que también corren en la JVM y en CI. La migración 2 -> 4
+reconstruye la tabla completa: si algo sale mal, el usuario pierde todo lo que
+tenía mapeado, y antes eso solo se descubría instalando la app.
+
 CI (`.github/workflows/ci.yml`) corre los dos grupos en cada push.
 
 ### Migraciones de Room
 
-El esquema se versiona en `android/app/schemas/`. La migración 2 → 4 reconstruye
-la tabla y todavía **no tiene prueba automática**: `MigrationTestHelper` necesita
-el JSON del esquema v2, que nunca se exportó porque `exportSchema` estaba en
-`false`. Para cubrirla hay que exportar (o escribir a mano) el esquema histórico
-v2 y agregar la prueba, que necesita un dispositivo o Robolectric.
+El esquema se versiona en `android/app/schemas/`: `1.json`, `2.json` y `4.json`.
+
+Los históricos **no se escribieron a mano**: `1.json` y `2.json` se generaron con
+el propio Room compilando el código de esas versiones (`exportSchema = true` en
+un worktree del commit correspondiente), así que describen la tabla tal como
+quedaba de verdad.
+
+El directorio se suma a los assets del variant principal porque los tests
+unitarios leen los assets de la app, no los del source set `test`. Son unos 8 KB
+en el APK.
+
+Para una versión nueva: subir `@Database(version = n)`, escribir la migración,
+dejar que el build genere `n.json`, y agregar el test. Room valida el esquema
+resultante contra `n.json`, así que una columna, un índice o un tipo que no
+coincidan hacen fallar el test en vez de romper en el dispositivo.

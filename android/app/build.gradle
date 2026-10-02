@@ -29,12 +29,19 @@ android {
     }
 
     sourceSets {
-        // El esquema se versiona en app/schemas para que las migraciones se
-        // puedan verificar con MigrationTestHelper. Sin esto, un error en una
-        // migración solo aparece en el dispositivo, con los datos del usuario ya
-        // adentro.
-        test {
+        // El esquema se versiona en app/schemas para que las migraciones se puedan
+        // verificar con MigrationTestHelper. Los tests unitarios leen los assets
+        // del variant de la app, no los del source set `test`, así que el
+        // directorio va en `main`. Son unos pocos KB.
+        main {
             assets.srcDirs += "$projectDir/schemas"
+        }
+    }
+
+    testOptions {
+        // Robolectric necesita los recursos para correr en la JVM.
+        unitTests {
+            includeAndroidResources = true
         }
     }
 }
@@ -59,7 +66,16 @@ dependencies {
     implementation 'androidx.room:room-runtime:2.6.1'
     annotationProcessor 'androidx.room:room-compiler:2.6.1'
 
-    // Tests unitarios de la lógica pura (Trilateration, SignalAggregator).
-    // Corren en la JVM, sin emulador.
+    // Tests unitarios de la lógica pura (Trilateration, SignalAggregator) y de
+    // las migraciones de Room. Corren en la JVM, sin emulador.
     testImplementation 'junit:junit:4.13.2'
+    // MigrationTestHelper sobre Robolectric: verifica que la migración produzca
+    // el esquema que Room espera, sin necesidad de un dispositivo.
+    testImplementation 'androidx.test:core:1.6.1'
+    testImplementation 'androidx.room:room-testing:2.6.1'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+    // Declarado como dependencia para que Gradle lo resuelva y lo cachee. Si no,
+    // Robolectric lo baja a ~/.m2 la primera vez que corre un test, y el cache
+    // de CI no cubre ese directorio. Es el build de API 34 que usa @Config.
+    testImplementation 'org.robolectric:android-all-instrumented:14-robolectric-10818077-i7'
 }

@@ -7,8 +7,18 @@ export const DECAY_DAYS = 7;
 /** Umbral para marcar una celda "en disputa". */
 export const CONTEST_THRESHOLD = 0.6;
 
-/** Ajusta un número al rango permitido y lo devuelve, o `fallback` si no es válido. */
+/**
+ * Ajusta un número al rango permitido y lo devuelve, o `fallback` si no es un
+ * número usable.
+ *
+ * Solo acepta números y cadenas numéricas no vacías a propósito: `Number()`
+ * convierte null, '', [], false y true en 0 o 1, que son valores válidos como
+ * número. Sin este filtro, un campo vacío en el panel acababa guardado como 0
+ * y cambiaba la resolución de toda la partida a celdas enormes.
+ */
 function clampNumber(value, min, max, fallback) {
+  if (typeof value !== 'number' && typeof value !== 'string') return fallback;
+  if (typeof value === 'string' && value.trim() === '') return fallback;
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));

@@ -350,7 +350,11 @@ app.put('/api/config', requireAdmin, async (req, res) => {
       'scan_interval_ms', 'calibration_tx', 'calibration_n'];
     const patch = {};
     for (const k of allowed) {
-      if (req.body && req.body[k] !== undefined) patch[k] = req.body[k];
+      const v = req.body?.[k];
+      // Solo números y cadenas: un objeto o un array acá se guardaría como
+      // texto basura y rompería la configuración al releerla.
+      if (v === undefined || (typeof v !== 'number' && typeof v !== 'string')) continue;
+      patch[k] = v;
     }
 
     // Acota los valores antes de guardarlos para que el panel y la partida

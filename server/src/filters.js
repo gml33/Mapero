@@ -75,14 +75,24 @@ export function aggregatedBandSql(alias = 'm') {
  * pesa más. Se corta en 0 para que las señales muy débiles no resten.
  */
 export function signalWeightSql(alias = 'm') {
-  return `GREATEST(${alias}.rssi + 90, 0)`;
+  const col = alias ? `${alias}.rssi` : 'rssi';
+  return `GREATEST(${col} + 90, 0)`;
 }
 
-/** Devuelve el valor de `sig` si es un número usable, o `undefined`. */
+/**
+ * Valor de `sig` si es un número usable, o `undefined`.
+ *
+ * Rechaza null, undefined y cadenas vacías a propósito: `Number(null)` y
+ * `Number('')` dan 0, que es un número válido, y `sig=0` significa "señales de
+ * 0 dBm o más", que ninguna red cumple. Sin este filtro, `?sig=null` vaciaría
+ * el mapa en vez de ignorar el parámetro.
+ */
 function minSignal(query) {
-  if (query.sig === undefined || query.sig === '') return undefined;
-  const min = Number(query.sig);
-  return Number.isFinite(min) ? min : undefined;
+  const v = query.sig;
+  if (typeof v !== 'number' && typeof v !== 'string') return undefined;
+  if (typeof v === 'string' && v.trim() === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 /**
@@ -131,7 +141,10 @@ export function rowFilters(query = {}, { alias = 'm', paramOffset = 0 } = {}) {
  * ignoran, igual que en `rowFilters`.
  */
 export function networkPredicate(query = {}) {
-  const { type, band, sig, user, q } = query;
+  const { type, user, q } = query;
+  // Igual que `rowFilters`: una banda que no existe se ignora en vez de vaciar
+  // el resultado. Sin esta validación, `?band=xyz` dejaba el mapa sin redes.
+  const band = BAND_VALUES.includes(String(query.band)) ? String(query.band) : null;
   const min = minSignal(query) ?? null;
   const needle = q ? String(q).toLowerCase() : '';
 

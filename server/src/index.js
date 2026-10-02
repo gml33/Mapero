@@ -7,10 +7,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool, initDb } from './db.js';
 import { buildTerritories, territoryOptions } from './territories.js';
-import { register, login, requireAuth, requireAdmin, createUser, setUserRole, setUserPassword } from './auth.js';
+import { register, login, requireAuth, requireAdmin, createUser, setUserRole,
+  setUserPassword, userForToken, revokeToken, bearerToken, socketToken,
+  minPassword } from './auth.js';
 import { getSettings, updateSettings, appConfig } from './config.js';
 import { rowFilters, networkPredicate, aggregatedOpenSql, aggregatedBandSql, signalWeightSql } from './filters.js';
 import { TtlCache } from './cache.js';
+import { RateLimiter } from './rate-limit.js';
 
 dotenv.config();
 
@@ -19,7 +22,13 @@ const PORT = Number(process.env.PORT || 8080);
 const API_KEY = process.env.API_KEY || 'mapero_dev_key';
 
 const app = express();
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+// CORS: same-origin por defecto. Abrirlo a todo (*) deja que cualquier sitio
+// llame a la API con el token de quien esté mirando su pestaña. Se puede abrir
+// a mano con CORS_ORIGIN si el front se sirve desde otro dominio.
+const corsOrigin = process.env.CORS_ORIGIN;
+app.use(cors(corsOrigin
+  ? { origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map((s) => s.trim()) }
+  : { origin: false }));
 app.use(express.json({ limit: '1mb' }));
 
 // ---- Servir la página web ----
@@ -28,7 +37,31 @@ app.get('/admin', (_req, res) =>
   res.sendFile(path.join(__dirname, '../public/admin.html')));
 
 // ---- Autenticación ----
+// 10 intentos por IP+usuario cada 15 minutos. Suficiente para que una app se
+// loguee sin problema y demasiado poco para fuerza bruta.
+const loginLimiter = new RateLimiter(15 * 60 * 1000, 10);
+const registerLimiter = new RateLimiter(60 * 60 * 1000, 5);
+setInterval(() => {
+  loginLimiter.sweep();
+  registerLimiter.sweep();
+}, 5 * 60 * 1000).unref();
+
+/** IP del cliente, detrás de un proxy si lo declara. */
+function clientIp(req) {
+  return req.ip || req.socket?.remoteAddress || 'desconocida';
+}
+
+function tooMany(res, retryAfterS) {
+  res.set('Retry-After', String(retryAfterS));
+  res.status(429).json({
+    error: `Demasiados intentos. Probá de nuevo en ${retryAfterS} s.`,
+  });
+}
+
 app.post('/api/auth/register', async (req, res) => {
+  const key = clientIp(req);
+  const gate = registerLimiter.hit(key);
+  if (!gate.allowed) return tooMany(res, gate.retryAfterS);
   try {
     const { token, username } = await register(req.body?.username, req.body?.password);
     res.status(201).json({ token, username });
@@ -38,13 +71,25 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
+  const key = `${clientIp(req)}:${String(req.body?.username || '')}`;
+  const gate = loginLimiter.hit(key);
+  if (!gate.allowed) return tooMany(res, gate.retryAfterS);
   try {
     const { token, username } = await login(req.body?.username, req.body?.password);
+    loginLimiter.reset(key);
     res.json({ token, username });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
 });
+
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
+  const revoked = await revokeToken(bearerToken(req));
+  res.json({ ok: true, revoked });
+});
+
+/** Mínimo de contraseña, para que el panel y la app lo muestren. */
+app.get('/api/auth/policy', (_req, res) => res.json({ minPassword: minPassword() }));
 
 // ---- Anti-cheat: velocidad máxima plausible (m/s). 40 m/s ≈ 144 km/h. ----
 const MAX_SPEED_MPS = 40;
@@ -53,7 +98,10 @@ const MAX_SPEED_MPS = 40;
 // dentro de un lote, así que 30 m es holgado: solo cubre el ruido del GPS.
 const MAX_STEP_M = 30;
 // Última posición conocida por usuario (para detectar teletransportes).
+// Con tope: sin esto el Map crece con cada usuario que alguna vez ingesta y no
+// vuelve a vaciarse nunca.
 const lastPos = new Map();
+const MAX_TRACKED_USERS = 10000;
 // Filas por sentencia de inserción. Postgres admite 65535 parámetros y cada
 // fila usa 9, así que el límite real es mucho más alto; 500 deja las sentencias
 // cómodamente chicas.
@@ -165,6 +213,13 @@ function antiCheat(userId, lat, lon, tsMs) {
   // Solo avanza la posición de referencia con una medición aceptada y con un
   // timestamp que no retrocede, así un rechazo no habilita el siguiente salto.
   if (allowed && (!prev || tsMs >= prev.ts)) {
+    // Al llegar al tope se descarta la entrada más antigua: es la que menos
+    // probable es que vuelva, y perderla solo hace que ese usuario pierda la
+    // referencia de un salto, no la protección de los siguientes.
+    if (lastPos.size >= MAX_TRACKED_USERS && !lastPos.has(userId)) {
+      const masAntigua = lastPos.keys().next().value;
+      lastPos.delete(masAntigua);
+    }
     lastPos.set(userId, { lat, lon, ts: tsMs });
   }
   return allowed;
@@ -256,6 +311,7 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
     if (inserted.length > 0) {
       invalidateCaches();
       broadcast({ type: 'measurements', data: inserted });
+      announceIngest(inserted.length);
     }
     res.json({ ok: true, inserted: inserted.length, dropped });
   } catch (e) {
@@ -521,17 +577,33 @@ app.get('/api/admin/settings', requireAdmin, async (_req, res) => {
 });
 
 // ---- WebSocket en tiempo real ----
+// El flujo crudo de mediciones lleva BSSID, SSID, señal y coordenadas GPS de
+// terceros, así que solo va a clientes con sesión. Sin sesión, el cliente
+// recibe un aviso de "hay datos nuevos" y recarga los agregados, que ya son
+// públicos por /api/networks. Así el mapa anónimo sigue siendo vivo sin
+// regalar la posición de nadie en tiempo real.
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on('connection', (ws) => {
-  ws.send(JSON.stringify({ type: 'hello', message: 'conectado' }));
+wss.on('connection', async (ws, req) => {
+  ws.authed = !!(await userForToken(socketToken(req)));
+  ws.send(JSON.stringify({ type: 'hello', authed: ws.authed }));
 });
 
 function broadcast(message) {
   const payload = JSON.stringify(message);
   for (const client of wss.clients) {
-    if (client.readyState === client.OPEN) {
+    if (client.authed && client.readyState === client.OPEN) {
+      client.send(payload);
+    }
+  }
+}
+
+/** Aviso sin datos para los clientes sin sesión. */
+function announceIngest(count) {
+  const payload = JSON.stringify({ type: 'ingest', count });
+  for (const client of wss.clients) {
+    if (!client.authed && client.readyState === client.OPEN) {
       client.send(payload);
     }
   }

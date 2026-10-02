@@ -200,6 +200,22 @@ Las funcionalidades planificadas (mapa web en tiempo real, API para compartir da
 
 ---
 
-## 📄 Licencia
+## 📄 Licencia y privacidad
 
-Proyecto de uso personal/educativo. No recopila ni envía datos a terceros; toda la información queda almacenada localmente.
+Proyecto de uso personal/educativo.
+
+**Qué se guarda y dónde.** Las mediciones (BSSID, SSID, señal, frecuencia,
+capabilities y las coordenadas GPS del momento del escaneo) quedan en el
+dispositivo, en la base local de Room. Si activás el streaming o te conectás a
+un servidor, **esas mismas mediciones se envían a ese servidor** y quedan
+guardadas en su base de datos mientras el servidor exista. No hay copia en
+ningún otro lado y el proyecto no manda nada a terceros por su cuenta.
+
+**Qué ve cualquiera que abra el mapa web.** El servidor es la única fuente de
+los datos compartidos, así que quien tenga su URL ve las redes agregadas por
+nombre con su posición aproximada, los territorios y el ranking de jugadores.
+Con sesión iniciada, además ve el flujo de mediciones en vivo.
+
+**Antes de exponerlo a internet.** El servidor no cifra el tráfico: la app y la
+web trabajan sobre HTTP. Si lo publicás, poné un proxy con TLS delante y
+configurá `CORS_ORIGIN` si el front va a vivir en otro dominio.

@@ -25,7 +25,7 @@ Variables de `.env`:
 | `PORT` | `8080` | Puerto HTTP/WS |
 | `DATABASE_URL` | `postgres://mapero:mapero_dev@localhost:5432/mapero` | Conexión PostgreSQL |
 | `API_KEY` | `mapero_dev_key` | Clave de escritura usada por la app |
-| `CORS_ORIGIN` | `*` | Origen permitido para CORS |
+| `CORS_ORIGIN` | *(vacío)* | Orígenes externos permitidos. Vacío = same-origin. |
 
 ## Ejecutar (local)
 
@@ -57,7 +57,7 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 
 ## Panel de administración
 - Web en **`/admin`**: estadísticas, usuarios (rol/borrado), mediciones y configuración del sistema.
-- Acceso restringido al **rol admin**. Definí el primer administrador con la variable `ADMIN_USER` (debe ser un usuario ya registrado); su rol se marca `admin` al arrancar.
+- Acceso restringido al **rol admin**. Definí el primer administrador con la variable `ADMIN_USER` (debe ser un usuario ya registrado); su rol se marca `admin` al arrancar, **solo si la base no tiene ningún admin todavía**.
 - La app Android descarga `GET /api/config` y aplica el intervalo de escaneo y la calibración editados desde el panel.
 
 ## Despliegue en un VPS
@@ -74,7 +74,9 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
 | `POST` | `/api/auth/register` | — | Crea usuario (`{username, password}`) → `{token, username}`. |
-| `POST` | `/api/auth/login` | — | Inicia sesión → `{token, username}`. |
+| `POST` | `/api/auth/login` | — | Inicia sesión → `{token, username}`. 10 intentos por IP+usuario cada 15 min. |
+| `POST` | `/api/auth/logout` | `Bearer` | Cierra la sesión del token. |
+| `GET` | `/api/auth/policy` | — | Mínimo de contraseña del servidor. |
 | `POST` | `/api/measurements` | `Bearer` | Ingresa mediciones del usuario autenticado. Emite broadcast por WS. |
 | `GET` | `/api/networks` | — | Redes agregadas (carga inicial de la web). Admite filtros, ver abajo. |
 | `GET` | `/api/users` | — | Lista de usuarios para el filtro del mapa. |
@@ -88,7 +90,7 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 | `GET` | `/api/admin/settings` | admin | Configuración actual. |
 | `GET` | `/api/last-position` | — | Última posición medida (centrado inicial). |
 | `GET` | `/health` | — | Estado. |
-| `WS` | `/ws` | — | Emite `{type:"measurements", data:[...]}` en tiempo real. |
+| `WS` | `/ws` | opcional | Con `?token=...` emite las mediciones en vivo. Sin token solo emite `{type:"ingest", count}`, un aviso para recargar los agregados públicos. |
 
 ### Ejemplo de ingesta
 ```bash
@@ -128,11 +130,29 @@ Un valor no reconocido se ignora en lugar de romper la consulta.
 Abrir `http://localhost:8080` en el navegador. La página:
 - Carga las redes iniciales desde `/api/networks`.
 - Permite compartir filtros en la URL (`type`, `band`, `sig`, `user`, `q`) y los aplica también del lado servidor.
-- Se conecta a `/ws` y, ante cada ingesta, reconcilia por HTTP las redes, los territorios y el leaderboard.
+- Se conecta a `/ws` y, ante cada ingesta, reconcilia por HTTP las redes, los territorios y el leaderboard. Sin sesión recibe un aviso sin datos; con sesión, el flujo crudo.
 - Muestra la **fecha de la última actualización** y el conteo de redes.
 
 ## Autenticación
-Registro/Login por usuario (hash **bcrypt**) que devuelve un **token de sesión**. Las peticiones de escritura llevan `Authorization: Bearer <token>`. La identidad del jugador es su **usuario**, y a él se atribuyen las mediciones, la conquista y el leaderboard.
+Registro/Login por usuario (hash **bcrypt**, 10 rondas) que devuelve un **token de sesión** válido por 30 días. Las peticiones de escritura llevan `Authorization: Bearer <token>`. La identidad del jugador es su **usuario**, y a él se atribuyen las mediciones, la conquista y el leaderboard.
+
+- Contraseña mínima de **8 caracteres** (se publica en `GET /api/auth/policy`).
+- Cambiar la contraseña cierra las sesiones abiertas de ese usuario.
+- `POST /api/auth/logout` revoca el token.
+
+### ADMIN_USER
+
+La variable de entorno nombra al primer administrador, pero **solo se aplica si la
+base todavía no tiene ningún admin**. Sin esa condición, cualquiera que se
+registrara con ese nombre quedaría con el rol en el reinicio siguiente. Si ya
+hay un admin, `ADMIN_USER` se ignora y queda registrado en el log.
+
+### CORS
+
+Por defecto el servidor **no** permite orígenes externos: el front se sirve
+desde el mismo backend, así que no hace falta. Si la web vive en otro dominio,
+definí `CORS_ORIGIN=https://tu-dominio.example` (admite una lista separada por
+comas).
 
 ## Juego de conquista
 La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su dueño. La posesión se calcula con **cobertura + decaimiento**: cada medición suma un peso que decae exponencialmente (~7 días); el dueño de un hexágono es el jugador con más cobertura acumulada. La identidad es el **usuario** autenticado.

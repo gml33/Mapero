@@ -26,7 +26,10 @@ services:
       PORT: 8080
       DATABASE_URL: postgres://mapero:${POSTGRES_PASSWORD:-mapero_dev}@db:5432/mapero
       API_KEY: ${API_KEY:-mapero_dev_key}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      # Vacío = same-origin. Solo si el front se sirve desde otro dominio:
+      # CORS_ORIGIN=https://tu-dominio.example
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      # Solo se aplica si la base todavía no tiene ningún admin.
       ADMIN_USER: ${ADMIN_USER:-}
     ports:
       - "${PORT:-8080}:8080"

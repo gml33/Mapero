@@ -222,8 +222,13 @@ document.getElementById('clearFiltersBtn').addEventListener('click', () => {
 
 // WebSocket en tiempo real
 let ws;
+// El flujo crudo de mediciones solo se recibe con sesión; sin ella el servidor
+// manda un aviso y recargamos los agregados, que son públicos. El browser no
+// permite cabeceras en un WebSocket, así que el token va por query.
 function connect() {
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const query = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
+  ws = new WebSocket(`${scheme}${location.host}/ws${query}`);
   ws.onopen = () => setStatus('En línea', true);
   ws.onclose = () => {
     setStatus('Sin conexión', false);
@@ -231,7 +236,7 @@ function connect() {
   };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if (msg.type === 'measurements') {
+    if (msg.type === 'measurements' || msg.type === 'ingest') {
       // Reconciliación: el WS avisa que hubo ingesta, el estado real se pide
       // por HTTP (agregado por red, territories y leaderboard).
       scheduleNetworkReload(800);
@@ -338,6 +343,10 @@ loginBtn.onclick = async () => {
       localStorage.setItem('mapero_token', data.token);
       localStorage.setItem('mapero_user', user);
       updateAuthUi();
+      // Reconecta para que el socket pase a recibir el flujo crudo: el que
+      // estaba abierto se había negotiated sin token.
+      if (ws) ws.close();
+      else connect();
       loadLeaderboard();
     } else {
       alert('No se pudo conectar');

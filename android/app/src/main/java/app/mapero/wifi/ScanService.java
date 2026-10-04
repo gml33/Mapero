@@ -10,10 +10,15 @@ import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 import app.mapero.wifi.scan.WifiScanner;
 import app.mapero.wifi.scan.WifiScannerHolder;
+
+import static android.Manifest.permission.POST_NOTIFICATIONS;
 
 /**
  * Servicio en primer plano que mantiene el escaneo WiFi activo con la pantalla
@@ -49,6 +54,7 @@ public class ScanService extends Service implements WifiScanner.Listener {
     }
 
     private void startAsForeground() {
+        ensureNotificationPermission();
         Notification notification = buildNotification("Escaneando WiFi…", 0);
         if (Build.VERSION.SDK_INT >= 29) {
             startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
@@ -57,11 +63,23 @@ public class ScanService extends Service implements WifiScanner.Listener {
         }
     }
 
+    private void ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                // En un Service no podemos mostrar el diálogo directamente.
+                // La app debe solicitar el permiso antes de iniciar el servicio.
+                // Log para depuración.
+                android.util.Log.w("ScanService", "Permiso POST_NOTIFICATIONS no concedido");
+            }
+        }
+    }
+
     private void stopScanning() {
         if (scanner != null) {
             scanner.stop();
         }
-        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopForeground(Service.STOP_FOREGROUND_REMOVE);
         stopSelf();
     }
 
@@ -69,32 +87,38 @@ public class ScanService extends Service implements WifiScanner.Listener {
         Intent tapIntent = new Intent(this, MainActivity.class);
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0, tapIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        String contentText = apCount > 0 ? "Escaneando WiFi… · " + apCount + " AP" : "Escaneando WiFi…";
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle(getString(R.string.app_name))
-                .setContentText(apCount > 0 ? text + " · " + apCount + " AP" : text)
+                .setContentText(apCount > 0 ? "Escaneando WiFi… · " + apCount + " AP" : "Escaneando WiFi…")
                 .setOngoing(true)
                 .setSilent(true)
-                .setContentIntent(contentIntent)
+                .setContentIntent(PendingIntent.getActivity(this, 0,
+                        new Intent(this, MainActivity.class),
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE))
                 .build();
     }
 
     private void createChannel() {
         NotificationManager nm = getSystemService(NotificationManager.class);
-        NotificationChannel channel =
-                new NotificationChannel(CHANNEL_ID, "Escaneo WiFi", NotificationManager.IMPORTANCE_LOW);
-        nm.createNotificationChannel(channel);
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            NotificationChannel channel =
+                    new NotificationChannel(CHANNEL_ID, "Escaneo WiFi", NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("Notificaciones del escaneo WiFi en segundo plano");
+            nm.createNotificationChannel(channel);
+        }
     }
 
     @Override
     public void onScanDone(int apCount) {
-        NotificationManager nm = getSystemService(NotificationManager.class);
+        NotificationManagerCompat nm = NotificationManagerCompat.from(this);
         nm.notify(NOTIF_ID, buildNotification("Escaneando WiFi…", apCount));
     }
 
     @Override
     public void onError(String message) {
-        NotificationManager nm = getSystemService(NotificationManager.class);
+        NotificationManagerCompat nm = NotificationManagerCompat.from(this);
         nm.notify(NOTIF_ID, buildNotification(message, 0));
     }
 

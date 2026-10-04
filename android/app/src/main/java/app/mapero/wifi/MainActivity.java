@@ -70,6 +70,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
     private static final String TAG = "MainActivity";
     private static final int REQ_PERMISSIONS = 100;
+    private static final int REQ_POST_NOTIFICATIONS = 101;
     private static final String EXTRA_SERVER_URL = "server_url";
     private static final String EXTRA_SERVER_USER = "server_user";
     private static final String EXTRA_SERVER_PASS = "server_pass";
@@ -229,6 +230,14 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
             } else {
                 Toast.makeText(this, "Permisos requeridos no concedidos", Toast.LENGTH_LONG).show();
             }
+        } else if (requestCode == REQ_POST_NOTIFICATIONS) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permiso concedido, iniciar escaneo
+                startScanning();
+            } else {
+                Toast.makeText(this, "Permiso de notificaciones requerido para el servicio en primer plano",
+                        Toast.LENGTH_LONG).show();
+            }
         }
     }
 
@@ -263,6 +272,15 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
     }
 
     private void startScanning() {
+        // Android 13+ requiere permiso POST_NOTIFICATIONS para mostrar la notificación del servicio
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_POST_NOTIFICATIONS);
+                return; // Esperar callback en onRequestPermissionsResult
+            }
+        }
         scanning = true;
         scanButton.setText(R.string.stop);
         statusText.setText(R.string.stopped);

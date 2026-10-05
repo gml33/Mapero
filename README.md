@@ -24,8 +24,9 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 - **Buscar red**: menú (⋮) → Buscar, autocompleta los SSID y centra el mapa en su ubicación.
 - **Animación sutil** ("pulso") al aparecer una red nueva.
 - **Burbuja de información** al tocar un punto (nombre de la red + señal + muestras), con botón de cierre.
-- **Exportación a CSV y KML** (compatible con Google Earth).
+- **Exportación a CSV y KML** (compatible con Google Earth) — **con filtros aplicados**.
 - **Leyenda** de colores en pantalla.
+- **Seguridad tri-estado** (abiertas/protegidas/sin datos) y banda 6 GHz — **paridad 100% app/servidor**.
 
 ---
 
@@ -38,8 +39,11 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 | Mapa | OSMDroid (OpenStreetMap, sin API key) |
 | Persistencia | Room (SQLite) |
 | Ciclo de vida | AppCompat / Lifecycle (LiveData) |
+| Backend | Node.js + Express + WebSocket + PostgreSQL |
+| Web | Leaflet + OpenStreetMap |
+| Tests | JUnit 4 + Robolectric (Android), Node test runner (servidor) |
 
-**Requisitos mínimos:** Android 8.0 (API 26) · target SDK 34.
+**Requisitos mínimos:** Android 8.0 (API 26) · **target SDK 35**.
 
 ---
 
@@ -59,7 +63,7 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 
 El proyecto está organizado en dos carpetas: **`android/`** (la app) y **`server/`** (el backend y la web). Los comandos de la app se ejecutan dentro de `android/`.
 
-Requisitos de entorno: **JDK 17**, **Android SDK 34** y **Gradle wrapper** incluido.
+Requisitos de entorno: **JDK 17**, **Android SDK 35** y **Gradle wrapper** incluido.
 
 ```bash
 cd android
@@ -109,12 +113,17 @@ La app acepta además estos extras por `adb shell am start`:
    - La subida es **incremental**: la app lleva el id de la última fila que el servidor confirmó y solo manda lo que falta. El servidor ignora lo que ya tiene, así que un reenvío no duplica nada.
 3. **Caminá** por la zona a mapear.
 4. Al volver, la app muestra los puntos coloreados por intensidad sobre las cuadras recorridas.
-5. Usá el **menú (⋮)** para **exportar a CSV/KML**, **borrar** los datos o **calibrar** la trilateración (potencia a 1 m y exponente de pérdida).
+5. Usá el **menú (⋮)** para **exportar a CSV/KML** (respetando filtros), **borrar** los datos o **calibrar** la trilateración (potencia a 1 m y exponente de pérdida).
 
 ### Controles del mapa
+
 - **Seguir (ON/OFF)**: activa/desactiva el centrado automático en tu posición. Se apaga solo al deslizar el mapa.
 - **Tocar un punto**: muestra el nombre de la red y sus datos. Cerrar con la **X**.
 - **Pellizco**: zoom. En zonas densas, el mapa prioriza las redes de mayor señal al alejar.
+- **Filtros (⋮ → Filtros)**: tipo (abiertas/protegidas/sin datos), banda (2.4/5/6 GHz), señal mínima, usuario, búsqueda, ocultar por nombre.
+- **Buscar (⋮ → Buscar)**: autocompleta SSID y centra el mapa.
+- **Exportar (⋮ → Exportar)**: CSV/KML **respetando los filtros activos**.
+- **Ocultar redes (⋮ → Ocultar)**: lista de SSID/BSSID a excluir.
 
 ---
 
@@ -125,8 +134,9 @@ La app acepta además estos extras por `adb shell am start`:
 | `ACCESS_WIFI_STATE` / `CHANGE_WIFI_STATE` | Escaneo WiFi |
 | `ACCESS_FINE_LOCATION` / `COARSE` | GPS + escaneo (API < 31) |
 | `NEARBY_WIFI_DEVICES` | Escaneo WiFi (API 33+) |
-| `POST_NOTIFICATIONS` | Notificación del servicio |
+| `POST_NOTIFICATIONS` | Notificación del servicio (Android 13+) |
 | `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_LOCATION` | Servicio en primer plano |
+| `ACCESS_BACKGROUND_LOCATION` | Servicio en background (Android 14+) |
 | `INTERNET` / `ACCESS_NETWORK_STATE` | Tiles del mapa |
 
 ---
@@ -146,7 +156,8 @@ La documentación detallada está en [`docs/`](docs/):
 | `data` | Room, entidades, DAO y agregación de señales |
 | `scan` | Escáner WiFi, GPS y singleton compartido |
 | `overlays` | Animaciones y burbuja de información del mapa |
-| `export` | Generación de CSV / KML |
+| `export` | Generación de CSV / KML **con filtros** |
+| `server` | Backend Node.js + web en tiempo real |
 
 ---
 
@@ -162,6 +173,7 @@ Tabla `measurements` — una fila por cada red detectada en cada barrido (con su
 | `latitude` / `longitude` | Posición GPS al detectarse |
 | `rssi` | Intensidad en dBm (suavizada) |
 | `frequency` | Frecuencia del canal |
+| `capabilities` | Capabilities del AP (WPA, WEP, etc.) |
 | `timestamp` | Momento de la medición |
 
 ---
@@ -172,7 +184,7 @@ La app puede subir sus mediciones a un servidor que las muestra en un **mapa web
 
 - **Backend**: Node.js + Express + WebSocket + PostgreSQL.
 - **API**: `POST /api/measurements` (ingesta), `GET /api/networks` (agregadas), `WS /ws` (broadcast).
-- **Web**: mapa Leaflet (OpenStreetMap) con actualización en tiempo real y fecha de última actualización.
+- **Web**: mapa Leaflet (OpenStreetMap) con actualización en tiempo real, fecha de última actualización y filtros.
 - **Docker**: el stack completo (backend + PostgreSQL) corre con `docker compose up -d --build` para desplegarlo en un VPS. Variables en `.env.example`.
 - **Panel de administración** en `/admin`: gestión de usuarios, mediciones, estadísticas y configuración del sistema (roles `admin`/`user`).
 - **Config remota**: la app descarga `/api/config` (intervalo de escaneo y calibración) y la aplica.
@@ -180,7 +192,7 @@ La app puede subir sus mediciones a un servidor que las muestra en un **mapa web
 
 ## 🗺️ Roadmap
 
-Las funcionalidades planificadas (mapa web en tiempo real, API para compartir datos entre dispositivos, fecha de última actualización y juego de conquista de zonas) están detalladas en [`ROADMAP.md`](ROADMAP.md).
+Las funcionalidades planificadas están detalladas en [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -198,6 +210,9 @@ Las funcionalidades planificadas (mapa web en tiempo real, API para compartir da
 - **La app se cierra al abrir:** reinstalá desde cero (`adb uninstall` + `install`); asegurate de que el tema sea `AppTheme` (Material). Ver historial de la rama.
 - **No se ven redes nuevas:** verificá que el WiFi esté encendido y que hayas concedido `NEARBY_WIFI_DEVICES` / `ACCESS_FINE_LOCATION`; el escaneo solo guarda datos cuando hay fix de GPS.
 - **El mapa no carga tiles:** se necesita conexión a internet (OpenStreetMap).
+- **Servicio se mata en background**: Config > Apps > WifiMapper > Batería > Sin restricciones.
+- **Notificaciones no aparecen**: Config > Apps > WifiMapper > Notificaciones > Permitir.
+- **SSL error en app**: Usa `http://IP:8080` temporal o configura Certbot bien.
 
 ---
 
@@ -205,18 +220,8 @@ Las funcionalidades planificadas (mapa web en tiempo real, API para compartir da
 
 Proyecto de uso personal/educativo.
 
-**Qué se guarda y dónde.** Las mediciones (BSSID, SSID, señal, frecuencia,
-capabilities y las coordenadas GPS del momento del escaneo) quedan en el
-dispositivo, en la base local de Room. Si activás el streaming o te conectás a
-un servidor, **esas mismas mediciones se envían a ese servidor** y quedan
-guardadas en su base de datos mientras el servidor exista. No hay copia en
-ningún otro lado y el proyecto no manda nada a terceros por su cuenta.
+**Qué se guarda y dónde.** Las mediciones (BSSID, SSID, señal, frecuencia, capabilities y las coordenadas GPS del momento del escaneo) quedan en el dispositivo, en la base local de Room. Si activás el streaming o te conectás a un servidor, **esas mismas mediciones se envían a ese servidor** y quedan guardadas en su base de datos mientras el servidor exista. No hay copia en ningún otro lado y el proyecto no manda nada a terceros por su cuenta.
 
-**Qué ve cualquiera que abra el mapa web.** El servidor es la única fuente de
-los datos compartidos, así que quien tenga su URL ve las redes agregadas por
-nombre con su posición aproximada, los territorios y el ranking de jugadores.
-Con sesión iniciada, además ve el flujo de mediciones en vivo.
+**Qué ve cualquiera que abra el mapa web.** El servidor es la única fuente de los datos compartidos, así que quien tenga su URL ve las redes agregadas por nombre con su posición aproximada, los territorios y el ranking de jugadores. Con sesión iniciada, además ve el flujo de mediciones en vivo.
 
-**Antes de exponerlo a internet.** El servidor no cifra el tráfico: la app y la
-web trabajan sobre HTTP. Si lo publicás, poné un proxy con TLS delante y
-configurá `CORS_ORIGIN` si el front va a vivir en otro dominio.
+**Antes de exponerlo a internet.** El servidor no cifra el tráfico: la app y la web trabajan sobre HTTP. Si lo publicás, poné un proxy con TLS delante y configurá `CORS_ORIGIN` si el front va a vivir en otro dominio.

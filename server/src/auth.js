@@ -114,7 +114,7 @@ export async function requireAuth(req, res, next) {
   try {
     const user = await userForToken(bearerToken(req));
     if (!user) {
-      return res.status(401).json({ error: 'Falta token' });
+      return res.status(401).json({ error: 'Falta el token de sesión' });
     }
     req.user = user;
     next();

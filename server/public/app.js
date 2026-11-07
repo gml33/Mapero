@@ -324,7 +324,7 @@ function updateAuthUi() {
 loginBtn.onclick = async () => {
   const user = prompt('Usuario:');
   if (!user) return;
-  const pass = prompt('Contraseña (si no existe el usuario, se crea):');
+  const pass = prompt('Contraseña (si el usuario no existe, lo creamos):');
   if (!pass) return;
   try {
     let res = await fetch('/api/auth/login', {
@@ -349,7 +349,7 @@ loginBtn.onclick = async () => {
       else connect();
       loadLeaderboard();
     } else {
-      alert('No se pudo conectar');
+      alert('No pudimos conectarnos al servidor. Revisá la URL e intentá de nuevo.');
     }
   } catch (e) {
     alert('Error: ' + e.message);

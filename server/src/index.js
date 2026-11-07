@@ -278,7 +278,7 @@ app.post('/api/measurements', requireAuth, async (req, res) => {
     res.json({ ok: true, inserted: inserted.length, duplicates: repetidas, dropped });
   } catch (e) {
     console.error('[api] error ingesta:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -289,7 +289,7 @@ app.get('/api/networks', async (req, res) => {
     res.json(rows.filter(networkPredicate(req.query)));
   } catch (e) {
     console.error('[api] error networks:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -300,7 +300,7 @@ app.get('/api/users', async (_req, res) => {
     res.json(rows);
   } catch (e) {
     console.error('[api] error users:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -310,7 +310,7 @@ app.get('/api/territories', async (_req, res) => {
     res.json(await loadTerritories());
   } catch (e) {
     console.error('[api] error territories:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -331,7 +331,7 @@ app.get('/api/leaderboard', async (_req, res) => {
     res.json(list.map((u, i) => ({ rank: i + 1, ...u })));
   } catch (e) {
     console.error('[api] error leaderboard:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -345,7 +345,7 @@ app.get('/api/last-position', async (_req, res) => {
     res.json({ latitude: rows[0].latitude, longitude: rows[0].longitude });
   } catch (e) {
     console.error('[api] error last-position:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -357,7 +357,7 @@ app.get('/api/config', async (_req, res) => {
   try {
     res.json(await appConfig());
   } catch (e) {
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -401,7 +401,7 @@ app.put('/api/config', requireAdmin, async (req, res) => {
     }
     res.json(await appConfig());
   } catch (e) {
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -419,7 +419,7 @@ app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
       territories: territories.length,
     });
   } catch (e) {
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -430,7 +430,7 @@ app.get('/api/admin/users', requireAdmin, async (_req, res) => {
       `SELECT id, username, role, created_at FROM users ORDER BY id`);
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -469,7 +469,7 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 
@@ -516,7 +516,7 @@ app.get('/api/admin/measurements', requireAdmin, async (req, res) => {
     res.json({ total: cnt.rows[0].n, offset, limit, rows: rows.rows });
   } catch (e) {
     console.error('[api] error mediciones admin:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Tuvimos un problema interno. Probá de nuevo.' });
   }
 });
 

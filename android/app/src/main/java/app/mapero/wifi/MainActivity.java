@@ -228,14 +228,14 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
             if (hasNeededPermissions()) {
                 startScanning();
             } else {
-                Toast.makeText(this, "Permisos requeridos no concedidos", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Necesitamos los permisos para poder mapear", Toast.LENGTH_LONG).show();
             }
         } else if (requestCode == REQ_POST_NOTIFICATIONS) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Permiso concedido, iniciar escaneo
                 startScanning();
             } else {
-                Toast.makeText(this, "Permiso de notificaciones requerido para el servicio en primer plano",
+                Toast.makeText(this, "Necesitamos permiso para mostrar la notificación del mapeo",
                         Toast.LENGTH_LONG).show();
             }
         }
@@ -758,7 +758,7 @@ public class MainActivity extends AppCompatActivity implements WifiScanner.Liste
 
     private void showSearchDialog() {
         if (lastSummaries == null || lastSummaries.isEmpty()) {
-            Toast.makeText(this, "Todavía no hay redes mapeadas", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Todavía no mapeaste ninguna red", Toast.LENGTH_SHORT).show();
             return;
         }
         java.util.Set<String> names = new java.util.LinkedHashSet<>();

@@ -1,5 +1,7 @@
 # WifiMapper
 
+![Mapero: mapa urbano con señales WiFi y puntos GPS](docs/assets/mapero-cover.png)
+
 Aplicación Android que **mapea redes WiFi en el espacio**: escanea las señales mientras caminás, registra su intensidad junto a las coordenadas GPS y las representa sobre un mapa de OpenStreetMap con colores según la potencia de la señal.
 
 Ideal para trazar la cobertura de una zona, localizar puntos de acceso o construir un mapa de redes similar a *Wigle.net*.
@@ -56,6 +58,9 @@ Ideal para trazar la cobertura de una zona, localizar puntos de acceso o constru
 ├── server/         # Backend (API + web en tiempo real) — Node.js
 ├── docs/           # Documentación técnica
 ├── README.md
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── LICENSE
 └── ROADMAP.md      # Funcionalidades futuras
 ```
 
@@ -194,6 +199,10 @@ La app puede subir sus mediciones a un servidor que las muestra en un **mapa web
 
 Las funcionalidades planificadas están detalladas en [`ROADMAP.md`](ROADMAP.md).
 
+## 🤝 Contribuir
+
+Consultá [`CONTRIBUTING.md`](CONTRIBUTING.md) para preparar cambios y ejecutar las validaciones locales. Los reportes sensibles deben seguir [`SECURITY.md`](SECURITY.md), no publicarse como issues.
+
 ---
 
 ## 🧭 Notas técnicas
@@ -212,16 +221,17 @@ Las funcionalidades planificadas están detalladas en [`ROADMAP.md`](ROADMAP.md)
 - **El mapa no carga tiles:** se necesita conexión a internet (OpenStreetMap).
 - **Servicio se mata en background**: Config > Apps > WifiMapper > Batería > Sin restricciones.
 - **Notificaciones no aparecen**: Config > Apps > WifiMapper > Notificaciones > Permitir.
-- **SSL error en app**: Usa `http://IP:8080` temporal o configura Certbot bien.
+- **SSL error en app**: En una build release usá una URL `https://` válida. Las builds debug permiten `http://IP:8080` sólo para desarrollo local.
 
 ---
 
 ## 📄 Licencia y privacidad
 
-Proyecto de uso personal/educativo.
+El código de este proyecto se distribuye bajo la [Apache License 2.0](LICENSE).
+Los datos recolectados por la aplicación no forman parte de la licencia del código.
 
 **Qué se guarda y dónde.** Las mediciones (BSSID, SSID, señal, frecuencia, capabilities y las coordenadas GPS del momento del escaneo) quedan en el dispositivo, en la base local de Room. Si activás el streaming o te conectás a un servidor, **esas mismas mediciones se envían a ese servidor** y quedan guardadas en su base de datos mientras el servidor exista. No hay copia en ningún otro lado y el proyecto no manda nada a terceros por su cuenta.
 
 **Qué ve cualquiera que abra el mapa web.** El servidor es la única fuente de los datos compartidos, así que quien tenga su URL ve las redes agregadas por nombre con su posición aproximada, los territorios y el ranking de jugadores. Con sesión iniciada, además ve el flujo de mediciones en vivo.
 
-**Antes de exponerlo a internet.** El servidor no cifra el tráfico: la app y la web trabajan sobre HTTP. Si lo publicás, poné un proxy con TLS delante y configurá `CORS_ORIGIN` si el front va a vivir en otro dominio.
+**Antes de exponerlo a internet.** El servidor no cifra el tráfico por sí mismo: la app y la web trabajan sobre HTTP en desarrollo. En producción, poné un proxy con TLS delante, usá una URL `https://` en la app y configurá `CORS_ORIGIN` si el front va a vivir en otro dominio. Las mediciones incluyen BSSID, SSID y coordenadas GPS; compartilas sólo con un servidor que controles y con consentimiento de las personas afectadas.

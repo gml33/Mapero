@@ -22,7 +22,7 @@ Funcionalidades previstas para el futuro, ordenadas por temática. Las que está
 - Pendientes: sincronización incremental (timestamp/offset), `GET /networks/{id}`, paginación y filtros.
 
 ### Consideraciones
-- Autenticación por token/API key por usuario o dispositivo.
+- Autenticación por token de sesión por usuario o dispositivo.
 - Validación y deduplicación de mediciones (BSSID + timestamp).
 - Paginación y filtros (zona, rango de señal, tiempo).
 

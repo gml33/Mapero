@@ -13,7 +13,7 @@ API y mapa web en tiempo real. Recibe las mediciones de la app Android, las guar
 createdb -O mapero mapero        # requiere rol "mapero" con password
 
 # 2) Configurar variables
-cp .env.example .env             # editar si hace falta (URL DB, API key, puerto)
+cp .env.example .env             # editar si hace falta (URL DB y puerto)
 
 # 3) Instalar dependencias
 npm install
@@ -23,8 +23,7 @@ Variables de `.env`:
 | Variable | Default | Descripción |
 |---|---|---|
 | `PORT` | `8080` | Puerto HTTP/WS |
-| `DATABASE_URL` | `postgres://mapero:mapero_dev@localhost:5432/mapero` | Conexión PostgreSQL |
-| `API_KEY` | `mapero_dev_key` | Clave de escritura usada por la app |
+| `DATABASE_URL` | — | Conexión PostgreSQL |
 | `CORS_ORIGIN` | *(vacío)* | Orígenes externos permitidos. Vacío = same-origin. |
 
 ## Ejecutar (local)
@@ -40,9 +39,8 @@ Al arrancar crea automáticamente las tablas (`devices`, `measurements`).
 Desde la raíz del proyecto (donde está `docker-compose.yml`), el stack levanta **PostgreSQL + backend/web**:
 
 ```bash
-# Variables (opcional; hay valores por defecto para dev)
+# Variables requeridas para Docker
 export POSTGRES_PASSWORD=clave_segura
-export API_KEY=clave_api
 export PORT=8080
 
 # Construir y levantar
@@ -51,7 +49,7 @@ docker compose up -d --build
 
 - `db`: PostgreSQL 16 con volumen persistente (`pgdata`).
 - `web`: imagen del backend (ver `server/Dockerfile`), espera a que la DB esté sana y expone el puerto.
-- Las variables se pasan vía entorno: `DATABASE_URL`, `API_KEY`, `CORS_ORIGIN`, `PORT`.
+- Las variables se pasan vía entorno: `DATABASE_URL`, `CORS_ORIGIN`, `PORT`.
 
 Para detener: `docker compose down` (con `-v` borra también el volumen de datos).
 
@@ -64,10 +62,12 @@ Para detener: `docker compose down` (con `-v` borra también el volumen de datos
 
 1. Llevá el proyecto (o el `docker-compose.yml` + `server/`) al VPS.
 2. Instalá Docker y Docker Compose.
-3. Configurá las variables (`POSTGRES_PASSWORD`, `API_KEY`) — para producción, con una **API key fuerte**.
+3. Configurá `POSTGRES_PASSWORD` con un secreto fuerte y mantenelo fuera del repositorio.
 4. `docker compose up -d --build`.
 5. Exponé el puerto (80/443) y, si usás HTTPS, un *reverse proxy* (Caddy/nginx) hacia el puerto del contenedor.
 6. En cada dispositivo Android, configurá la URL del servidor (IP/dominio público) en **Mapero → menú (⋮) → Servidor**.
+
+La app release rechaza HTTP claro; usá siempre una URL `https://` en producción. Sólo las builds debug permiten HTTP para desarrollo local.
 
 ## Endpoints
 
@@ -107,7 +107,7 @@ duplicados presentes esa sentencia abortaría todo el arranque.
 ```bash
 curl -X POST http://localhost:8080/api/measurements \
   -H "Content-Type: application/json" \
-  -H "x-api-key: mapero_dev_key" \
+  -H "Authorization: Bearer <token>" \
   -d '{"measurements":[
         {"bssid":"aa:bb:cc:00:11:22","ssid":"MiRed","latitude":-34.61,"longitude":-58.41,"rssi":-50,"frequency":2412,"timestamp":1700000000000}
       ]}'
@@ -175,7 +175,7 @@ La web y la app muestran territorios (hexágonos H3 de ~150 m) coloreados por su
 **Configuración de la partida:** la resolución del hexágono (`hex_res`, 0–15), el decaimiento (`decay_days`) y el umbral de disputa (`contest_threshold`) se editan en el panel admin y **sí se aplican**: se leen de `settings` con validación de rango, y un cambio recalcula los donos. La app Android solo consume el intervalo de escaneo y la calibración.
 
 ## App Android
-La app sube cada barrido a `{serverUrl}/api/measurements`. Configurar la URL y la API key desde **Mapero → menú (⋮) → Servidor**. Para desarrollo en la misma red local, la URL del servidor es la IP LAN de la máquina (p. ej. `http://192.168.0.12:8080`).
+La app sube cada barrido a `{serverUrl}/api/measurements`. Configurá la URL y la cuenta desde **Mapero → menú (⋮) → Servidor**. Para desarrollo en la misma red local, la URL del servidor es la IP LAN de la máquina (p. ej. `http://192.168.0.12:8080`).
 
 El envío se controla con el botón **"Streaming: ON/OFF"** de la app: con ON, cada barrido se sube en tiempo real; con OFF, los datos quedan solo en el dispositivo.
 

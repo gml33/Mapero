@@ -18,6 +18,20 @@ android/app/build/
 # Servidor
 server/node_modules/
 server/.env
+*.env
+*.env.*
+!.env.example
+!server/.env.example
+
+# Secretos, certificados y credenciales locales
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials.json
+secrets.json
 
 # Variables del stack (no versionar secretos)
 .env

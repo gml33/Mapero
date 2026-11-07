@@ -20,8 +20,6 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
-const API_KEY = process.env.API_KEY || 'mapero_dev_key';
-
 const app = express();
 // CORS: same-origin por defecto. Abrirlo a todo (*) deja que cualquier sitio
 // llame a la API con el token de quien esté mirando su pestaña. Se puede abrir

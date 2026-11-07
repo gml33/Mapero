@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: mapero
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mapero_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: mapero
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -24,8 +24,7 @@ services:
         condition: service_healthy
     environment:
       PORT: 8080
-      DATABASE_URL: postgres://mapero:${POSTGRES_PASSWORD:-mapero_dev}@db:5432/mapero
-      API_KEY: ${API_KEY:-mapero_dev_key}
+      DATABASE_URL: postgres://mapero:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/mapero
       # Vacío = same-origin. Solo si el front se sirve desde otro dominio:
       # CORS_ORIGIN=https://tu-dominio.example
       CORS_ORIGIN: ${CORS_ORIGIN:-}

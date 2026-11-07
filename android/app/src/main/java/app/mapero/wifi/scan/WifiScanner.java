@@ -107,11 +107,11 @@ public class WifiScanner {
             return;
         }
         if (!wifiManager.isWifiEnabled()) {
-            notifyError("Habilita el WiFi para escanear");
+            notifyError("Activá el WiFi para escanear");
             return;
         }
         if (!hasLocationPermission()) {
-            notifyError("Falta permiso de ubicación");
+            notifyError("Falta el permiso de ubicación");
             return;
         }
         running = true;
@@ -157,7 +157,7 @@ public class WifiScanner {
     @SuppressLint("MissingPermission")
     private void requestScan() {
         if (!hasScanPermission()) {
-            notifyError("Falta permiso para escanear WiFi");
+            notifyError("Falta el permiso para escanear WiFi");
             return;
         }
         if (!wifiManager.startScan()) {
@@ -170,7 +170,7 @@ public class WifiScanner {
         try {
             results = wifiManager.getScanResults();
         } catch (SecurityException e) {
-            notifyError("Sin permiso para leer resultados WiFi");
+            notifyError("No tenemos permiso para leer los resultados WiFi");
             return;
         }
 

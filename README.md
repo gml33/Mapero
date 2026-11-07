@@ -1,6 +1,6 @@
 # WifiMapper
 
-![Mapero: mapa urbano con señales WiFi y puntos GPS](docs/assets/mapero-cover.png)
+![Mapero: mapa urbano con señales WiFi y puntos GPS](docs/assets/mapero-cover.jpg)
 
 Aplicación Android que **mapea redes WiFi en el espacio**: escanea las señales mientras caminás, registra su intensidad junto a las coordenadas GPS y las representa sobre un mapa de OpenStreetMap con colores según la potencia de la señal.
 

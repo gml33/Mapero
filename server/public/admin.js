@@ -6,7 +6,7 @@ async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   const res = await fetch(path, { ...opts, headers });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error');
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'No pudimos completar la operación');
   return res.status === 200 ? res.json() : null;
 }
 
@@ -111,8 +111,8 @@ async function renderUsers() {
         <field><label>Contraseña</label><input id="nu_pass" type="password" required></field>
         <field><label>Rol</label>
           <select id="nu_role">
-            <option value="user">user</option>
-            <option value="admin">admin</option>
+            <option value="user">Usuario</option>
+            <option value="admin">Administrador</option>
           </select>
         </field>
         <field class="full"><button type="submit">Crear</button></field>
@@ -125,11 +125,11 @@ async function renderUsers() {
           <td>${u.id}</td><td>${esc(u.username)}</td>
           <td>
             <select onchange="setRole(${u.id}, this.value)">
-              <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
-              <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+              <option value="user" ${u.role === 'user' ? 'selected' : ''}>Usuario</option>
+              <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrador</option>
             </select>
           </td>
-          <td><input id="pass_${u.id}" type="password" placeholder="nueva pass" style="padding:5px;border:1px solid #ccc;border-radius:6px">
+          <td><input id="pass_${u.id}" type="password" placeholder="nueva contraseña" style="padding:5px;border:1px solid #ccc;border-radius:6px">
             <button class="small" onclick="changePass(${u.id})">Cambiar</button></td>
           <td>${new Date(u.created_at).toLocaleDateString()}</td>
           <td><button class="small danger" onclick="delUser(${u.id})">Borrar</button></td>
@@ -239,9 +239,9 @@ async function renderMeasurements(d) {
     <div class="card"><h2>Mediciones (${d.total})</h2>
       <button class="danger" onclick="clearMeasurements()">Borrar todas</button>
       <div style="margin:8px 0">
-        <button ${d.offset === 0 ? 'disabled' : ''} onclick="pageMeas(-1)">← Prev</button>
+        <button ${d.offset === 0 ? 'disabled' : ''} onclick="pageMeas(-1)">← Anterior</button>
         <span style="margin:0 10px;font-size:13px">Página ${page} de ${pages}</span>
-        <button ${d.offset + d.limit >= d.total ? 'disabled' : ''} onclick="pageMeas(1)">Next →</button>
+        <button ${d.offset + d.limit >= d.total ? 'disabled' : ''} onclick="pageMeas(1)">Siguiente →</button>
       </div>
       <table>
         <tr>
